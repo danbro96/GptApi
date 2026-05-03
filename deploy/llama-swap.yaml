@@ -6,8 +6,24 @@
 healthCheckTimeout: 240
 
 models:
-  # Light, default. Same brain as Q8 but ~half the memory bandwidth — much faster on
-  # CPU. Pick this for everyday code-agent use.
+  # Default — fast 8B dense. Loads in ~10s, ~25-40 tok/s on the Xeon. Strong tool
+  # calling and HumanEval for size; right pick for Cline / everyday chat.
+  "qwen3-8b":
+    cmd: >
+      llama-server
+      --port ${PORT}
+      --model /cache/Qwen3-8B-UD-Q4_K_XL.gguf
+      --ctx-size 32768
+      --threads 20
+      --jinja
+      --flash-attn
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+      --numa isolate
+    ttl: 1800   # unload after 30 min idle so the host can reclaim ~5 GB
+
+  # Medium — Qwen 3.6-35B-A3B at Q4. MoE (3B active) but memory-bandwidth bound on
+  # CPU — practically ~5-10 tok/s. Pick when the 8B feels under-powered.
   "qwen3.6-35b-a3b-q4":
     cmd: >
       llama-server

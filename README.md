@@ -10,12 +10,13 @@ rate limiting, OpenAPI docs, and OpenTelemetry. A
 image `ghcr.io/mostlygeek/llama-swap:cpu`) proxies in front of `llama-server`,
 loading and unloading models on demand so only one is resident at a time.
 
-Default model pair (same brain, two performance tiers):
+Three-tier model ladder (pick by sending the id in the `model` field):
 
-| Model id | Quantization | Disk | Approx tok/s on Xeon Gold 6248 |
-|---|---|---|---|
-| `qwen3.6-35b-a3b-q4` (light, default) | Unsloth Dynamic Q4_K_XL | ~22 GB | ~12–20 tok/s |
-| `qwen3.6-35b-a3b-q8` (heavy, on-demand) | Unsloth Dynamic Q8_K_XL | ~38 GB | ~6–10 tok/s |
+| Model id | Family | Disk | Approx tok/s on Xeon Gold 6248 | When to use |
+|---|---|---|---|---|
+| `qwen3-8b` (default) | Qwen 3 8B Instruct, dense, UD-Q4_K_XL | ~5 GB | **~25–40 tok/s** | Cline + everyday chat. The new daily driver. |
+| `qwen3.6-35b-a3b-q4` (medium) | Qwen 3.6-35B-A3B MoE, UD-Q4_K_XL | ~22 GB | ~5–10 tok/s | When the 8B feels under-powered. |
+| `qwen3.6-35b-a3b-q8` (heavy) | Qwen 3.6-35B-A3B MoE, UD-Q8_K_XL | ~38 GB | ~3–6 tok/s | Final-pass / hard reasoning. Lossless quality. |
 
 Pick a model by sending its id in the `model` field of any chat-completion
 request. First request after switching pays a ~30–60 s mmap penalty; subsequent
@@ -74,17 +75,18 @@ GptApi works as a drop-in OpenAI-compatible backend for VS Code coding agents.
 Default 32K context, Bearer auth, and `--jinja` (correct tool-call rendering on
 Qwen 3.6) make this work out of the box.
 
-Two model ids to pick from in any client's model dropdown:
+Three model ids to pick from in any client's model dropdown:
 
-- `qwen3.6-35b-a3b-q4` — fast, default for everyday work
-- `qwen3.6-35b-a3b-q8` — slower, peak quality, on-demand
+- `qwen3-8b` — fast (~25–40 tok/s), default for Cline + chat
+- `qwen3.6-35b-a3b-q4` — slower, more capable when the 8B isn't enough
+- `qwen3.6-35b-a3b-q8` — slowest, peak quality on-demand
 
 ### Cline — agentic file edits + tool calling (recommended)
 
 1. Install the **Cline** extension.
 2. Settings → API Provider → **OpenAI Compatible**.
 3. Base URL: `https://gpt.lupira.com/v1`, API key: `$GPT_API_KEY`.
-4. Model id: `qwen3.6-35b-a3b-q4` to start; switch to `-q8` for hard tasks.
+4. Model id: `qwen3-8b` (default). Switch to `qwen3.6-35b-a3b-q4` or `-q8` when you need more capability and can wait.
 5. Enable **Auto-approve** for `read_file`/`list_files` if you want a smoother loop.
 
 ### Continue.dev — alt for chat + agent mode
@@ -93,13 +95,19 @@ Two model ids to pick from in any client's model dropdown:
 
 ```yaml
 models:
-  - name: GptApi (Q4, fast)
+  - name: GptApi (8B, fast)
+    provider: openai
+    apiBase: https://gpt.lupira.com/v1
+    apiKey: ${env:GPT_API_KEY}
+    model: qwen3-8b
+    roles: [chat, edit, apply]
+  - name: GptApi (35B Q4, capable)
     provider: openai
     apiBase: https://gpt.lupira.com/v1
     apiKey: ${env:GPT_API_KEY}
     model: qwen3.6-35b-a3b-q4
     roles: [chat, edit, apply]
-  - name: GptApi (Q8, quality)
+  - name: GptApi (35B Q8, max quality)
     provider: openai
     apiBase: https://gpt.lupira.com/v1
     apiKey: ${env:GPT_API_KEY}
