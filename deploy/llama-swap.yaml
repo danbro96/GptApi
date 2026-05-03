@@ -16,10 +16,6 @@ models:
       --ctx-size 32768
       --threads 20
       --jinja
-      --flash-attn
-      --cache-type-k q8_0
-      --cache-type-v q8_0
-      --numa isolate
     ttl: 1800   # unload after 30 min idle so the host can reclaim ~5 GB
 
   # Medium — Qwen 3.6-35B-A3B at Q4. MoE (3B active) but memory-bandwidth bound on
@@ -32,10 +28,6 @@ models:
       --ctx-size 32768
       --threads 20
       --jinja
-      --flash-attn
-      --cache-type-k q8_0
-      --cache-type-v q8_0
-      --numa isolate
     ttl: 1800   # unload after 30 min idle so the host can reclaim ~22 GB
 
   # Heavy, on-demand. Lossless quantization; pick for hard questions or final
@@ -48,8 +40,4 @@ models:
       --ctx-size 32768
       --threads 20
       --jinja
-      --flash-attn
-      --cache-type-k q8_0
-      --cache-type-v q8_0
-      --numa isolate
     ttl: 1800
