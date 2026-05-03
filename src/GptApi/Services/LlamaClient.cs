@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Text;
 
 namespace GptApi.Services;
@@ -9,9 +9,9 @@ namespace GptApi.Services;
 /// </summary>
 public sealed class LlamaClient
 {
-    static readonly MediaTypeHeaderValue JsonContentType = new("application/json");
+    private static readonly MediaTypeHeaderValue _jsonContentType = new("application/json");
 
-    readonly HttpClient _http;
+    private readonly HttpClient _http;
 
     public LlamaClient(HttpClient http) => _http = http;
 
@@ -53,10 +53,10 @@ public sealed class LlamaClient
     public Task<HttpResponseMessage> StreamCompletionAsync(string requestJson, CancellationToken ct) =>
         PostJsonStreamingAsync("/v1/completions", requestJson, ct);
 
-    async Task<string> PostJsonBufferedAsync(string path, string requestJson, CancellationToken ct)
+    private async Task<string> PostJsonBufferedAsync(string path, string requestJson, CancellationToken ct)
     {
         using var content = new StringContent(requestJson, Encoding.UTF8);
-        content.Headers.ContentType = JsonContentType;
+        content.Headers.ContentType = _jsonContentType;
         using var resp = await _http.PostAsync(path, content, ct);
         var body = await resp.Content.ReadAsStringAsync(ct);
         if (!resp.IsSuccessStatusCode)
@@ -64,10 +64,10 @@ public sealed class LlamaClient
         return body;
     }
 
-    async Task<HttpResponseMessage> PostJsonStreamingAsync(string path, string requestJson, CancellationToken ct)
+    private async Task<HttpResponseMessage> PostJsonStreamingAsync(string path, string requestJson, CancellationToken ct)
     {
         var content = new StringContent(requestJson, Encoding.UTF8);
-        content.Headers.ContentType = JsonContentType;
+        content.Headers.ContentType = _jsonContentType;
 
         using var msg = new HttpRequestMessage(HttpMethod.Post, path) { Content = content };
         var resp = await _http.SendAsync(msg, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -77,6 +77,7 @@ public sealed class LlamaClient
             resp.Dispose();
             throw new HttpRequestException(error, inner: null, statusCode: resp.StatusCode);
         }
+
         return resp;
     }
 }

@@ -1,5 +1,4 @@
-using GptApi.Models;
-using Microsoft.AspNetCore.Http.HttpResults;
+﻿using GptApi.Models;
 using Microsoft.Extensions.Options;
 
 namespace GptApi.Endpoints;

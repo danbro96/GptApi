@@ -1,21 +1,21 @@
-using System.Diagnostics;
-using System.Net;
-using System.Text.Json;
-using GptApi.Models;
+﻿using GptApi.Models;
 using GptApi.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
+using System.Net;
+using System.Text.Json;
 
 namespace GptApi.Handlers;
 
 public sealed class ChatHandler
 {
-    static readonly ActivitySource ActivitySource = new("GptApi.Chat");
+    private static readonly ActivitySource _activitySource = new("GptApi.Chat");
 
-    readonly LlamaClient _client;
-    readonly ILogger<ChatHandler> _log;
-    readonly LlamaOptions _options;
-    readonly JsonSerializerOptions _json;
+    private readonly LlamaClient _client;
+    private readonly ILogger<ChatHandler> _log;
+    private readonly LlamaOptions _options;
+    private readonly JsonSerializerOptions _json;
 
     public ChatHandler(
         LlamaClient client,
@@ -45,7 +45,7 @@ public sealed class ChatHandler
             streaming: _client.StreamCompletionAsync,
             ct);
 
-    async Task<Results<Ok<TResponse>, ProblemHttpResult, EmptyHttpResult>>
+    private async Task<Results<Ok<TResponse>, ProblemHttpResult, EmptyHttpResult>>
         DispatchAsync<TRequest, TResponse>(
             TRequest req,
             string activityName,
@@ -59,7 +59,7 @@ public sealed class ChatHandler
         var validation = Validate(req);
         if (validation is not null) return validation;
 
-        using var activity = ActivitySource.StartActivity(activityName);
+        using var activity = _activitySource.StartActivity(activityName);
         ApplyRequestTags(activity, req);
 
         var requestJson = JsonSerializer.Serialize(req, _json);
@@ -113,27 +113,32 @@ public sealed class ChatHandler
         }
     }
 
-    static ProblemHttpResult? Validate<TRequest>(TRequest req) where TRequest : class => req switch
-    {
-        ChatCompletionRequest c when string.IsNullOrWhiteSpace(c.Model)
-            => TypedResults.Problem(detail: "model is required", statusCode: 400),
-        ChatCompletionRequest c when c.Messages is null || c.Messages.Count == 0
-            => TypedResults.Problem(detail: "messages must be a non-empty array", statusCode: 400),
-        CompletionRequest p when string.IsNullOrWhiteSpace(p.Model)
-            => TypedResults.Problem(detail: "model is required", statusCode: 400),
-        CompletionRequest p when p.Prompt.ValueKind == JsonValueKind.Undefined || p.Prompt.ValueKind == JsonValueKind.Null
-            => TypedResults.Problem(detail: "prompt is required", statusCode: 400),
-        _ => null,
-    };
+    private static ProblemHttpResult? Validate<TRequest>(TRequest req)
+        where TRequest : class
+        => req switch
+        {
+            ChatCompletionRequest c when string.IsNullOrWhiteSpace(c.Model)
+                => TypedResults.Problem(detail: "model is required", statusCode: 400),
+            ChatCompletionRequest c when c.Messages is null || c.Messages.Count == 0
+                => TypedResults.Problem(detail: "messages must be a non-empty array", statusCode: 400),
+            CompletionRequest p when string.IsNullOrWhiteSpace(p.Model)
+                => TypedResults.Problem(detail: "model is required", statusCode: 400),
+            CompletionRequest p when p.Prompt.ValueKind == JsonValueKind.Undefined || p.Prompt.ValueKind == JsonValueKind.Null
+                => TypedResults.Problem(detail: "prompt is required", statusCode: 400),
+            _ => null,
+        };
 
-    static bool IsStreaming<TRequest>(TRequest req) where TRequest : class => req switch
-    {
-        ChatCompletionRequest c => c.Stream,
-        CompletionRequest p => p.Stream,
-        _ => false,
-    };
+    private static bool IsStreaming<TRequest>(TRequest req)
+        where TRequest : class
+        => req switch
+        {
+            ChatCompletionRequest c => c.Stream,
+            CompletionRequest p => p.Stream,
+            _ => false,
+        };
 
-    static void ApplyRequestTags<TRequest>(Activity? activity, TRequest req) where TRequest : class
+    private static void ApplyRequestTags<TRequest>(Activity? activity, TRequest req)
+        where TRequest : class
     {
         if (activity is null) return;
         switch (req)
@@ -153,7 +158,8 @@ public sealed class ChatHandler
         }
     }
 
-    static void ApplyResponseTags<TResponse>(Activity? activity, TResponse typed) where TResponse : class
+    private static void ApplyResponseTags<TResponse>(Activity? activity, TResponse typed)
+        where TResponse : class
     {
         if (activity is null) return;
         var usage = typed switch
@@ -168,7 +174,7 @@ public sealed class ChatHandler
         activity.SetTag("gen_ai.usage.total_tokens", usage.TotalTokens);
     }
 
-    static async Task PipeAndFlushAsync(Stream source, Stream destination, CancellationToken ct)
+    private static async Task PipeAndFlushAsync(Stream source, Stream destination, CancellationToken ct)
     {
         // Small buffer + explicit flush per read so SSE tokens reach the client as fast as
         // llama-server emits them. Default Stream.CopyToAsync uses an 80 KiB buffer that
