@@ -30,6 +30,8 @@ builder.Services.AddHttpClient<LlamaClient>((sp, http) =>
 });
 
 builder.Services.AddScoped<ChatHandler>();
+builder.Services.AddScoped<ModelsHandler>();
+builder.Services.AddScoped<HealthHandler>();
 
 builder.Services
     .AddAuthentication(ApiKeyAuthOptions.SchemeName)

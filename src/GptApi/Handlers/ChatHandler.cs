@@ -1,4 +1,4 @@
-﻿using GptApi.Models;
+using GptApi.Models;
 using GptApi.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;

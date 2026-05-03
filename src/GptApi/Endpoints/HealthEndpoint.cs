@@ -1,21 +1,11 @@
-using GptApi.Models;
-using GptApi.Services;
-using Microsoft.AspNetCore.Http.HttpResults;
+using GptApi.Handlers;
 
 namespace GptApi.Endpoints;
 
 public static class HealthEndpoint
 {
     public static IEndpointConventionBuilder MapHealthEndpoint(this IEndpointRouteBuilder app) =>
-        app.MapGet("/healthz", async Task<Results<Ok<HealthResponse>, ProblemHttpResult>> (
-                LlamaClient client,
-                CancellationToken ct) =>
-            {
-                var ok = await client.IsHealthyAsync(ct);
-                return ok
-                    ? TypedResults.Ok(new HealthResponse { Status = "ok" })
-                    : TypedResults.Problem(detail: "worker unhealthy", statusCode: 503);
-            })
+        app.MapGet("/healthz", (HealthHandler h, CancellationToken ct) => h.CheckAsync(ct))
             .AllowAnonymous()
             .WithTags("Meta")
             .WithSummary("Health probe (cascades to the worker).")
