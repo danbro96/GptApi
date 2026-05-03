@@ -5,7 +5,7 @@ services:
     environment:
       Llama__WorkerUrl: http://gpt-worker:9000
       Llama__RequestTimeoutSeconds: ${REQUEST_TIMEOUT:-300}
-      Llama__ServedModelId: ${SERVED_MODEL_ID:-qwen2.5-32b-instruct}
+      Llama__ServedModelId: ${SERVED_MODEL_ID:-qwen3.6-35b-a3b}
       Auth__ApiKeys__0__Key: ${GPT_API_KEY:?required}
       Auth__ApiKeys__0__Name: ${GPT_API_KEY_NAME:-prod}
       Auth__AllowedOrigins__0: ${ALLOWED_ORIGIN:-}
@@ -37,7 +37,7 @@ services:
     container_name: gpt-worker
     command:
       - "-m"
-      - "/cache/${MODEL_FILE:-qwen2.5-32b-instruct-q4_k_m.gguf}"
+      - "/cache/${MODEL_FILE:-Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf}"
       - "-c"
       - "${CONTEXT_SIZE:-8192}"
       - "--threads"
@@ -48,15 +48,15 @@ services:
       - "9000"
       - "--metrics"
     volumes:
-      - /mnt/tank2/appdata/gpt/cache:/cache
+      - /mnt/tank2/appdata/gpt_api/cache:/cache
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9000/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 10
-      # 32B Q4 takes ~30-60s to mmap and warm on cold start; generous start_period
-      # keeps the worker out of "unhealthy" while it loads.
-      start_period: 180s
+      # Qwen3.6-35B-A3B at Q8 (~38 GB) takes ~60-90s to mmap and warm on cold start;
+      # generous start_period keeps the worker out of "unhealthy" while it loads.
+      start_period: 240s
     restart: unless-stopped
 
 networks:

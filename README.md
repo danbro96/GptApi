@@ -7,8 +7,8 @@ configurable base URL.
 Two-image deploy: a thin .NET 10 minimal-API frontend (`gpt-api`) handles auth,
 rate limiting, OpenAPI docs, and OpenTelemetry. A `llama-server` sidecar
 (`gpt-worker`, upstream `ghcr.io/ggml-org/llama.cpp:server`) does the actual
-inference on CPU. Sized for the MedelyNAS Xeon Gold 6248 running a single 30B-class
-GGUF model resident.
+inference on CPU. Default model is Qwen 3.6-35B-A3B (MoE, 3B active per token,
+Unsloth Dynamic Q8) — sized for the MedelyNAS Xeon Gold 6248 / 125 GiB RAM.
 
 ## Endpoints
 
