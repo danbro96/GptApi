@@ -1,0 +1,67 @@
+services:
+  gpt-api:
+    image: danbro96/gpt-api:${IMAGE_TAG:-latest}
+    container_name: gpt-api
+    environment:
+      Llama__WorkerUrl: http://gpt-worker:9000
+      Llama__RequestTimeoutSeconds: ${REQUEST_TIMEOUT:-300}
+      Llama__ServedModelId: ${SERVED_MODEL_ID:-qwen2.5-32b-instruct}
+      Auth__ApiKeys__0__Key: ${GPT_API_KEY:?required}
+      Auth__ApiKeys__0__Name: ${GPT_API_KEY_NAME:-prod}
+      Auth__AllowedOrigins__0: ${ALLOWED_ORIGIN:-}
+      RateLimit__RequestsPerMinute: ${RATE_LIMIT:-30}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
+      OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-deployment.environment=prod,host.name=medelynas}
+    ports:
+      - "${HOST_PORT:-40480}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      gpt-worker:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - default
+      - medelynas_telemetry
+
+  gpt-worker:
+    # Upstream llama.cpp OpenAI-compatible server. No custom image needed —
+    # everything we want lives in stock llama-server.
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: gpt-worker
+    command:
+      - "-m"
+      - "/cache/${MODEL_FILE:-qwen2.5-32b-instruct-q4_k_m.gguf}"
+      - "-c"
+      - "${CONTEXT_SIZE:-8192}"
+      - "--threads"
+      - "${THREADS:-20}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "9000"
+      - "--metrics"
+    volumes:
+      - /mnt/tank2/appdata/gpt/cache:/cache
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      # 32B Q4 takes ~30-60s to mmap and warm on cold start; generous start_period
+      # keeps the worker out of "unhealthy" while it loads.
+      start_period: 180s
+    restart: unless-stopped
+
+networks:
+  default:
+    driver: bridge
+  medelynas_telemetry:
+    external: true
+    name: medelynas_telemetry
