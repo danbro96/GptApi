@@ -31,6 +31,20 @@ public sealed class LlamaClient
     }
 
     /// <summary>
+    /// Returns the worker's <c>/v1/models</c> body verbatim. With llama-swap this is
+    /// the dynamic list of configured models; with bare llama-server it's the single
+    /// loaded model. Either way we forward unchanged to keep clients honest.
+    /// </summary>
+    public async Task<string> GetModelsAsync(CancellationToken ct)
+    {
+        using var resp = await _http.GetAsync("/v1/models", ct);
+        var body = await resp.Content.ReadAsStringAsync(ct);
+        if (!resp.IsSuccessStatusCode)
+            throw new HttpRequestException(body, inner: null, statusCode: resp.StatusCode);
+        return body;
+    }
+
+    /// <summary>
     /// Buffered chat completion. Returns the full JSON response body as a string.
     /// </summary>
     public async Task<string> ChatCompletionAsync(string requestJson, CancellationToken ct) =>

@@ -5,7 +5,6 @@ services:
     environment:
       Llama__WorkerUrl: http://gpt-worker:9000
       Llama__RequestTimeoutSeconds: ${REQUEST_TIMEOUT:-300}
-      Llama__ServedModelId: ${SERVED_MODEL_ID:-qwen3.6-35b-a3b}
       Auth__ApiKeys__0__Key: ${GPT_API_KEY:?required}
       Auth__ApiKeys__0__Name: ${GPT_API_KEY_NAME:-prod}
       Auth__AllowedOrigins__0: ${ALLOWED_ORIGIN:-}
@@ -31,41 +30,27 @@ services:
       - medelynas_telemetry
 
   gpt-worker:
-    # Upstream llama.cpp OpenAI-compatible server. No custom image needed —
-    # everything we want lives in stock llama-server.
-    image: ghcr.io/ggml-org/llama.cpp:server
+    # llama-swap proxies in front of llama-server, loading/unloading models on
+    # demand so only one is resident at a time. The :cpu image bundles a CPU build
+    # of llama-server. Models declared in llama-swap.yaml.
+    image: ghcr.io/mostlygeek/llama-swap:cpu
     container_name: gpt-worker
     command:
-      - "-m"
-      - "/cache/${MODEL_FILE:-Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf}"
-      - "-c"
-      - "${CONTEXT_SIZE:-32768}"
-      - "--threads"
-      - "${THREADS:-20}"
-      - "--host"
-      - "0.0.0.0"
-      - "--port"
-      - "9000"
-      - "--metrics"
-      # --jinja: use the GGUF's embedded chat template, required for tool calls.
-      - "--jinja"
-      # --flash-attn: faster attention + lower KV memory at long context.
-      - "--flash-attn"
-      # Q8 KV cache halves memory at negligible quality cost; pays for the 32K context.
-      - "--cache-type-k"
-      - "q8_0"
-      - "--cache-type-v"
-      - "q8_0"
+      - "-config"
+      - "/config.yaml"
+      - "-listen"
+      - "0.0.0.0:9000"
     volumes:
       - /mnt/tank2/appdata/gpt_api/cache:/cache
+      - /mnt/tank2/appdata/gpt_api/llama-swap.yaml:/config.yaml:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9000/health || exit 1"]
       interval: 30s
       timeout: 5s
-      retries: 10
-      # Qwen3.6-35B-A3B at Q8 (~38 GB) takes ~60-90s to mmap and warm on cold start;
-      # generous start_period keeps the worker out of "unhealthy" while it loads.
-      start_period: 240s
+      retries: 5
+      # llama-swap itself starts in <1s; the model-load wait happens on first
+      # request, gated by healthCheckTimeout in llama-swap.yaml.
+      start_period: 30s
     restart: unless-stopped
 
 networks:

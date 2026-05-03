@@ -5,17 +5,29 @@ Drop-in replacement for `https://api.openai.com/v1/*` for any client that suppor
 configurable base URL.
 
 Two-image deploy: a thin .NET 10 minimal-API frontend (`gpt-api`) handles auth,
-rate limiting, OpenAPI docs, and OpenTelemetry. A `llama-server` sidecar
-(`gpt-worker`, upstream `ghcr.io/ggml-org/llama.cpp:server`) does the actual
-inference on CPU. Default model is Qwen 3.6-35B-A3B (MoE, 3B active per token,
-Unsloth Dynamic Q8) — sized for the MedelyNAS Xeon Gold 6248 / 125 GiB RAM.
+rate limiting, OpenAPI docs, and OpenTelemetry. A
+[`llama-swap`](https://github.com/mostlygeek/llama-swap) sidecar (`gpt-worker`,
+image `ghcr.io/mostlygeek/llama-swap:cpu`) proxies in front of `llama-server`,
+loading and unloading models on demand so only one is resident at a time.
+
+Default model pair (same brain, two performance tiers):
+
+| Model id | Quantization | Disk | Approx tok/s on Xeon Gold 6248 |
+|---|---|---|---|
+| `qwen3.6-35b-a3b-q4` (light, default) | Unsloth Dynamic Q4_K_XL | ~22 GB | ~12–20 tok/s |
+| `qwen3.6-35b-a3b-q8` (heavy, on-demand) | Unsloth Dynamic Q8_K_XL | ~38 GB | ~6–10 tok/s |
+
+Pick a model by sending its id in the `model` field of any chat-completion
+request. First request after switching pays a ~30–60 s mmap penalty; subsequent
+requests on the same model are fast. Edit
+[`deploy/llama-swap.yaml`](deploy/llama-swap.yaml) to add or tune models.
 
 ## Endpoints
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `GET` | `/healthz` | anonymous | Liveness; cascades to worker `/health`. |
-| `GET` | `/v1/models` | api-key | Lists the loaded model in OpenAI shape. |
+| `GET` | `/v1/models` | api-key | Lists the configured models (proxied from llama-swap, 60 s cache). |
 | `POST` | `/v1/chat/completions` | api-key | Chat completion. Set `stream: true` for SSE. |
 | `POST` | `/v1/completions` | api-key | Legacy text completion. Same `stream` semantics. |
 | `GET` | `/openapi/v1.json` | anonymous | OpenAPI 3 schema. |
@@ -59,26 +71,21 @@ header `X-API-Key: dev-key`.
 ## VS Code as a coding agent
 
 GptApi works as a drop-in OpenAI-compatible backend for VS Code coding agents.
-Default `CONTEXT_SIZE=32768` and `--jinja` (correct tool-call rendering for
-Qwen3.6) make this work out of the box.
+Default 32K context, Bearer auth, and `--jinja` (correct tool-call rendering on
+Qwen 3.6) make this work out of the box.
 
-### GitHub Copilot Chat — Bring Your Own Key (chat panel)
+Two model ids to pick from in any client's model dropdown:
 
-Native, GA April 2026. Settings UI:
+- `qwen3.6-35b-a3b-q4` — fast, default for everyday work
+- `qwen3.6-35b-a3b-q8` — slower, peak quality, on-demand
 
-1. Command Palette → **GitHub Copilot: Manage models**.
-2. Add model → provider **OpenAI Compatible**.
-3. Base URL: `https://gpt.lupira.com/v1`
-4. API key: `$GPT_API_KEY`
-5. Model id: `qwen3.6-35b-a3b`
-
-### Cline — agentic file edits + tool calling (recommended for repo work)
+### Cline — agentic file edits + tool calling (recommended)
 
 1. Install the **Cline** extension.
 2. Settings → API Provider → **OpenAI Compatible**.
-3. Base URL: `https://gpt.lupira.com/v1`, API key: `$GPT_API_KEY`,
-   Model id: `qwen3.6-35b-a3b`.
-4. Enable **Auto-approve** for `read_file`/`list_files` if you want a smoother loop.
+3. Base URL: `https://gpt.lupira.com/v1`, API key: `$GPT_API_KEY`.
+4. Model id: `qwen3.6-35b-a3b-q4` to start; switch to `-q8` for hard tasks.
+5. Enable **Auto-approve** for `read_file`/`list_files` if you want a smoother loop.
 
 ### Continue.dev — alt for chat + agent mode
 
@@ -86,15 +93,28 @@ Native, GA April 2026. Settings UI:
 
 ```yaml
 models:
-  - name: GptApi (qwen3.6-35b-a3b)
+  - name: GptApi (Q4, fast)
     provider: openai
     apiBase: https://gpt.lupira.com/v1
     apiKey: ${env:GPT_API_KEY}
-    model: qwen3.6-35b-a3b
+    model: qwen3.6-35b-a3b-q4
+    roles: [chat, edit, apply]
+  - name: GptApi (Q8, quality)
+    provider: openai
+    apiBase: https://gpt.lupira.com/v1
+    apiKey: ${env:GPT_API_KEY}
+    model: qwen3.6-35b-a3b-q8
     roles: [chat, edit, apply]
 ```
 
-### Tool calling (Cline / Copilot agent mode)
+### GitHub Copilot Chat BYOK — currently broken
+
+VS Code's BYOK for "OpenAI Compatible" providers is unreliable as of early 2026:
+[microsoft/vscode#289003](https://github.com/microsoft/vscode/issues/289003).
+Custom models added via `chatLanguageModels.json` don't reliably appear in the
+model picker. Use Cline or Continue.dev until that's fixed.
+
+### Tool calling (Cline / agent mode)
 
 Qwen 3.6 supports OpenAI-shape tool calls natively, and GptApi passes them
 through unchanged (request fields like `tools` / `tool_choice` and the

@@ -20,6 +20,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<LlamaOptions>(builder.Configuration.GetSection("Llama"));
 builder.Services.Configure<ApiKeyAuthOptions>(builder.Configuration.GetSection("Auth"));
 
+builder.Services.AddMemoryCache();
+
 builder.Services.AddHttpClient<LlamaClient>((sp, http) =>
 {
     var opts = sp.GetRequiredService<IOptions<LlamaOptions>>().Value;
