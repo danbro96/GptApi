@@ -9,6 +9,8 @@ namespace GptApi.Auth;
 
 public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthOptions>
 {
+    const string BearerPrefix = "Bearer ";
+
     public ApiKeyAuthenticationHandler(
         IOptionsMonitor<ApiKeyAuthOptions> options,
         ILoggerFactory logger,
@@ -38,6 +40,17 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
 
     static string? ExtractKey(HttpRequest req)
     {
+        // Authorization: Bearer <key> — what every mainstream OpenAI-compat client sends.
+        if (req.Headers.TryGetValue("Authorization", out var auth) && auth.Count > 0)
+        {
+            var value = auth[0];
+            if (!string.IsNullOrEmpty(value)
+                && value.StartsWith(BearerPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                var token = value.AsSpan(BearerPrefix.Length).Trim();
+                if (token.Length > 0) return token.ToString();
+            }
+        }
         if (req.Headers.TryGetValue(ApiKeyAuthOptions.HeaderName, out var hdr) && hdr.Count > 0)
             return hdr[0];
         if (req.Query.TryGetValue(ApiKeyAuthOptions.QueryName, out var qs) && qs.Count > 0)

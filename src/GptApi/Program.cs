@@ -92,12 +92,20 @@ builder.Services.AddOpenApi("v1", options =>
         };
         document.Components ??= new();
         document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            Description = "Bearer token. Send `Authorization: Bearer <key>`. " +
+                "Standard for OpenAI-compatible clients.",
+        };
         document.Components.SecuritySchemes["ApiKey"] = new OpenApiSecurityScheme
         {
             Type = SecuritySchemeType.ApiKey,
             In = ParameterLocation.Header,
             Name = ApiKeyAuthOptions.HeaderName,
-            Description = "API key. Send in the X-API-Key header.",
+            Description = "API key. Send in the X-API-Key header. " +
+                "Used by KokoroApi/FlorenceApi-style internal callers.",
         };
         return Task.CompletedTask;
     });
@@ -109,6 +117,10 @@ builder.Services.AddOpenApi("v1", options =>
         if (requiresAuth)
         {
             operation.Security ??= new List<OpenApiSecurityRequirement>();
+            operation.Security.Add(new OpenApiSecurityRequirement
+            {
+                [new OpenApiSecuritySchemeReference("Bearer", context.Document)] = new List<string>(),
+            });
             operation.Security.Add(new OpenApiSecurityRequirement
             {
                 [new OpenApiSecuritySchemeReference("ApiKey", context.Document)] = new List<string>(),

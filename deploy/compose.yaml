@@ -39,7 +39,7 @@ services:
       - "-m"
       - "/cache/${MODEL_FILE:-Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf}"
       - "-c"
-      - "${CONTEXT_SIZE:-8192}"
+      - "${CONTEXT_SIZE:-32768}"
       - "--threads"
       - "${THREADS:-20}"
       - "--host"
@@ -47,6 +47,15 @@ services:
       - "--port"
       - "9000"
       - "--metrics"
+      # --jinja: use the GGUF's embedded chat template, required for tool calls.
+      - "--jinja"
+      # --flash-attn: faster attention + lower KV memory at long context.
+      - "--flash-attn"
+      # Q8 KV cache halves memory at negligible quality cost; pays for the 32K context.
+      - "--cache-type-k"
+      - "q8_0"
+      - "--cache-type-v"
+      - "q8_0"
     volumes:
       - /mnt/tank2/appdata/gpt_api/cache:/cache
     healthcheck:
