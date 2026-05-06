@@ -1,4 +1,5 @@
 using GptApi.Handlers;
+using GptApi.Models;
 
 namespace GptApi.Endpoints;
 
@@ -15,5 +16,8 @@ public static class ModelsEndpoint
                 one by sending its `id` in the `model` field of completion requests.
 
                 Cached for 60 s to avoid hammering the worker on every IDE poll.
-                """);
+                """)
+            .Produces<ModelsResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status502BadGateway)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 }

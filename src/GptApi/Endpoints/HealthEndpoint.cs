@@ -1,4 +1,5 @@
 using GptApi.Handlers;
+using GptApi.Models;
 
 namespace GptApi.Endpoints;
 
@@ -15,5 +16,7 @@ public static class HealthEndpoint
                 llama-server worker are reachable. Returns 503 when the worker is
                 unreachable or unhealthy. Anonymous — no API key required, suitable for
                 the container healthcheck.
-                """);
+                """)
+            .Produces<HealthResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 }
