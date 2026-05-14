@@ -8,6 +8,7 @@ public static class HealthEndpoint
     public static IEndpointConventionBuilder MapHealthEndpoint(this IEndpointRouteBuilder app) =>
         app.MapGet("/healthz", (HealthHandler h, CancellationToken ct) => h.CheckAsync(ct))
             .AllowAnonymous()
+            .DisableHttpMetrics()
             .WithTags("Meta")
             .WithSummary("Health probe (cascades to the worker).")
             .WithDescription(
