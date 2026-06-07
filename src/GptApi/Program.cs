@@ -31,7 +31,9 @@ builder.Services.AddHttpClient<LlamaClient>((sp, http) =>
 
 builder.Services.AddScoped<ChatHandler>();
 builder.Services.AddScoped<ModelsHandler>();
-builder.Services.AddScoped<HealthHandler>();
+
+// Liveness (/livez) + readiness (/readyz, pings the llama-server worker) probes.
+builder.Services.AddAppHealthChecks();
 
 builder.Services
     .AddAuthentication(ApiKeyAuthOptions.SchemeName)
@@ -173,7 +175,7 @@ app.MapScalarApiReference("/scalar", o => o
         .WithTheme(ScalarTheme.BluePlanet))
     .AllowAnonymous();
 
-app.MapHealthEndpoint();
+app.MapAppHealthChecks(app.Environment);
 app.MapModelsEndpoint().RequireAuthorization();
 app.MapChatCompletions().RequireAuthorization();
 app.MapCompletions().RequireAuthorization();

@@ -27,7 +27,8 @@ requests on the same model are fast. Edit
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| `GET` | `/healthz` | anonymous | Liveness; cascades to worker `/health`. |
+| `GET` | `/livez` | anonymous | Liveness; process up (no dependency check). |
+| `GET` | `/readyz` | anonymous | Readiness; pings the llama-server worker. Used by the container healthcheck. |
 | `GET` | `/v1/models` | api-key | Lists the configured models (proxied from llama-swap, 60 s cache). |
 | `POST` | `/v1/chat/completions` | api-key | Chat completion. Set `stream: true` for SSE. |
 | `POST` | `/v1/completions` | api-key | Legacy text completion. Same `stream` semantics. |
