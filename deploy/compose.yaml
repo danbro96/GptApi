@@ -1,3 +1,7 @@
+# Reference Compose for GptApi — gpt-api (.NET frontend) + gpt-worker (llama-swap).
+# Every host, port, and URL below is an overridable ${VAR:-default} sample from the maintainer's
+# deployment — override them for your environment (see deploy/.env.example). Values marked :?required must be set.
+# Model list / GGUF filenames / per-model flags live in deploy/llama-swap.yaml.
 services:
   gpt-api:
     image: danbro96/gpt-api:${IMAGE_TAG:-latest}
