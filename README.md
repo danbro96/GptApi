@@ -86,7 +86,7 @@ Three model ids to pick from in any client's model dropdown:
 
 1. Install the **Cline** extension.
 2. Settings → API Provider → **OpenAI Compatible**.
-3. Base URL: `https://gpt.lupira.com/v1`, API key: `$GPT_API_KEY`.
+3. Base URL: `https://gpt-api.lupira.com/v1`, API key: `$GPT_API_KEY`.
 4. Model id: `qwen3-8b` (default). Switch to `qwen3.6-35b-a3b-q4` or `-q8` when you need more capability and can wait.
 5. Enable **Auto-approve** for `read_file`/`list_files` if you want a smoother loop.
 
@@ -98,19 +98,19 @@ Three model ids to pick from in any client's model dropdown:
 models:
   - name: GptApi (8B, fast)
     provider: openai
-    apiBase: https://gpt.lupira.com/v1
+    apiBase: https://gpt-api.lupira.com/v1
     apiKey: ${env:GPT_API_KEY}
     model: qwen3-8b
     roles: [chat, edit, apply]
   - name: GptApi (35B Q4, capable)
     provider: openai
-    apiBase: https://gpt.lupira.com/v1
+    apiBase: https://gpt-api.lupira.com/v1
     apiKey: ${env:GPT_API_KEY}
     model: qwen3.6-35b-a3b-q4
     roles: [chat, edit, apply]
   - name: GptApi (35B Q8, max quality)
     provider: openai
-    apiBase: https://gpt.lupira.com/v1
+    apiBase: https://gpt-api.lupira.com/v1
     apiKey: ${env:GPT_API_KEY}
     model: qwen3.6-35b-a3b-q8
     roles: [chat, edit, apply]
