@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/GptApi/GptApi.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GptApi.UnitTests/GptApi.UnitTests.csproj" />
+  </Folder>
 </Solution>
