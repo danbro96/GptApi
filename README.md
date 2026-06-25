@@ -11,19 +11,19 @@ only when the primary worker is unreachable. Backends and routes are config (see
 [`deploy/compose.yaml`](deploy/compose.yaml)), so where a model runs is an ops decision, not a
 code change.
 
-Model roster (pick by sending the id in the `model` field). Placement is by availability +
-workload shape, not size — see the DevOps `Websites/gpt-api/model-selection.md`:
+Example roster (pick by sending the id in the `model` field). Place models by availability +
+workload shape, not size — heavy generation on a GPU host, always-on small models locally:
 
 | Model id | Role | Backend (primary → fallback) | Notes |
 |---|---|---|---|
-| `qwen3-14b` | Workhorse — capture / elicit / orchestration | Storm RX 9070 XT → NAS CPU | Heavy generation; kept warm on the GPU |
-| `qwen3-1.7b` | Triage — cheap actionable-or-not gate | NAS CPU | Always-on, runs on every inbound |
-| `qwen3-embedding-0.6b` | Embeddings — retrieval / dedup (`/v1/embeddings`) | NAS A380 → NAS CPU | Single-pass encoder, resident |
-| `qwen3-reranker-0.6b` | Reranker (optional) | NAS A380 → NAS CPU | Add only if retrieval looks noisy |
+| `qwen3-14b` | Workhorse — generation / orchestration | GPU host → CPU | Heavy generation; kept warm on the GPU |
+| `qwen3-1.7b` | Triage — cheap actionable-or-not gate | CPU | Always-on, runs on every inbound |
+| `qwen3-embedding-0.6b` | Embeddings — retrieval / dedup (`/v1/embeddings`) | local GPU → CPU | Single-pass encoder, resident |
+| `qwen3-reranker-0.6b` | Reranker (`/v1/rerank`) | local GPU → CPU | Cross-encoder; re-scores the embedding top-K |
 
-A `model` with no configured route goes to the default backend (the always-on NAS). Edit
-[`deploy/llama-swap.yaml`](deploy/llama-swap.yaml) (CPU), `llama-swap.gpu.yaml` (Storm), or
-`llama-swap.a380.yaml` (Arc) to add or tune models on a given host.
+A `model` with no configured route goes to the default backend (an always-on one). Edit
+[`deploy/llama-swap.yaml`](deploy/llama-swap.yaml) (CPU), `llama-swap.gpu.yaml` (GPU host), or
+`llama-swap.a380.yaml` (local GPU encoders) to add or tune models on a given host.
 
 ## Endpoints
 
@@ -81,13 +81,13 @@ make this work out of the box.
 
 The agent-facing model in any client's dropdown:
 
-- `qwen3-14b` — the workhorse, on the Storm GPU (falls back to NAS CPU if Storm is offline)
+- `qwen3-14b` — the workhorse, on the GPU host (falls back to CPU if that host is offline)
 
 ### Cline — agentic file edits + tool calling (recommended)
 
 1. Install the **Cline** extension.
 2. Settings → API Provider → **OpenAI Compatible**.
-3. Base URL: `https://gpt-api.lupira.com/v1`, API key: `$GPT_API_KEY`.
+3. Base URL: `https://your-gateway/v1`, API key: `$GPT_API_KEY`.
 4. Model id: `qwen3-14b` (the workhorse).
 5. Enable **Auto-approve** for `read_file`/`list_files` if you want a smoother loop.
 
@@ -99,7 +99,7 @@ The agent-facing model in any client's dropdown:
 models:
   - name: GptApi (workhorse)
     provider: openai
-    apiBase: https://gpt-api.lupira.com/v1
+    apiBase: https://your-gateway/v1
     apiKey: ${env:GPT_API_KEY}
     model: qwen3-14b
     roles: [chat, edit, apply]
@@ -127,15 +127,11 @@ clients would see broken responses.
   Continue.dev's `provider: llama.cpp` directly at the worker if you really
   want this later.
 
-## Production deploy
+## Deploy
 
-Mirrors the `FlorenceApi` / `KokoroApi` shape — TrueNAS Custom App, Cloudflare
-Tunnel, OpenObserve telemetry. See
-[`DevOps/Websites/gpt-api/deployment.md`](../../Nextcloud/Familj/DevOps/Websites/gpt-api/deployment.md)
-in the DevOps repo for the full first-time stand-up.
-
-The compose template lives in [`deploy/compose.yaml`](deploy/compose.yaml); copy
-[`deploy/.env.example`](deploy/.env.example) to `deploy/.env` and edit.
+Run the gateway + workers with [`deploy/compose.yaml`](deploy/compose.yaml): copy
+[`deploy/.env.example`](deploy/.env.example) to `deploy/.env`, set your backend URLs + API key,
+and point each worker at its `deploy/llama-swap*.yaml` model roster.
 
 ## Conventions
 

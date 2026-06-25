@@ -37,6 +37,7 @@ builder.Services.AddSingleton<LlamaRouter>();
 builder.Services.AddScoped<ChatHandler>();
 builder.Services.AddScoped<ModelsHandler>();
 builder.Services.AddScoped<EmbeddingsHandler>();
+builder.Services.AddScoped<RerankHandler>();
 
 // Liveness (/livez) + readiness (/readyz, pings the llama-server worker) probes.
 builder.Services.AddAppHealthChecks();
@@ -186,6 +187,7 @@ app.MapModelsEndpoint().RequireAuthorization();
 app.MapChatCompletions().RequireAuthorization();
 app.MapCompletions().RequireAuthorization();
 app.MapEmbeddings().RequireAuthorization();
+app.MapRerank().RequireAuthorization();
 
 app.Run();
 

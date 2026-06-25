@@ -1,17 +1,9 @@
-# llama-swap config for the NAS CPU worker (Xeon Gold 6248, AVX-512, 20 cores, 128 GB DDR4).
-# Role in the split topology: always-on triage + fallback roster + the gpt-oss-120b TOP TIER.
-# The GPU hosts (Storm, A380) carry the hot paths; this worker keeps the assistant alive when
-# they're offline, and is the always-on home of the heavy quality model.
-# Mounted as /config.yaml. GGUF filenames are placeholders — match the cache dir.
+# CPU worker: triage + fallback roster + the gpt-oss-120b top tier (pure-CPU MoE).
+# GGUFs: Unsloth UD (Qwen3); ggml-org (gpt-oss MXFP4, reranker). Stage into /cache.
+healthCheckTimeout: 300   # 120B cold mmap is the long pole
 
-# CPU mmap of the 120B (~63 GB) is the long pole; give cold loads room.
-healthCheckTimeout: 300
-
-# Groups keep triage permanently warm while the heavy models swap among themselves:
-#  - "resident" is persistent → never evicted by a heavy load.
-#  - "heavy" has swap:true → exactly one of {120b, 14b-fallback, embed-fallback} is resident at a
-#    time (so the 120B and the 14B fallback never co-load and blow the RAM budget), and
-#    exclusive:false → loading one does NOT evict the resident triage.
+# Triage stays warm; the heavy models swap among themselves so the 120B and the 14B-fallback
+# never co-load (RAM budget), without evicting triage.
 groups:
   "resident":
     persistent: true
@@ -20,56 +12,35 @@ groups:
   "heavy":
     swap: true
     exclusive: false
-    members: ["gpt-oss-120b", "qwen3-14b", "qwen3-embedding-0.6b"]
+    members: ["gpt-oss-120b", "qwen3-14b", "qwen3-embedding-0.6b", "qwen3-reranker-0.6b"]
 
 models:
-  # Triage — Qwen3-1.7B. Cheap "is this actionable?" gate run on every inbound; PC-independent.
-  # ttl 0 + the "resident" group = always warm, never swapped out by a heavy load.
-  "qwen3-1.7b":
+  "qwen3-1.7b":            # triage, always warm
     cmd: >
-      llama-server
-      --port ${PORT}
-      --model /cache/Qwen3-1.7B-Q4_K_M.gguf
-      --ctx-size 32768
-      --threads 20
-      --jinja
+      llama-server --port ${PORT} --model /cache/Qwen3-1.7B-UD-Q4_K_XL.gguf
+      --ctx-size 32768 --threads 20 --jinja
     ttl: 0
 
-  # Top quality tier — gpt-oss-120b (117B / ~5.1B active MoE, ~63 GB MXFP4), pure-CPU. Always-on
-  # home (NAS is 24/7), load-on-demand: committed only during a batch then idle-unloads. Thread-
-  # limited to leave cores for Jellyfin/Nextcloud/gateway. RAM while running ~66-70 GB — keep
-  # zfs_arc_max capped (~32 GB) on the host so ARC doesn't collide. ~10-15 tok/s @ 4ch DDR4-2400.
-  "gpt-oss-120b":
+  "gpt-oss-120b":          # top tier, load-on-demand (~63 GB, 3 shards — pass 00001); thread-limited
     cmd: >
-      llama-server
-      --port ${PORT}
-      --model /cache/gpt-oss-120b-MXFP4.gguf
-      --n-gpu-layers 0
-      --ctx-size 16384
-      --threads 16
-      --jinja
+      llama-server --port ${PORT} --model /cache/gpt-oss-120b-mxfp4-00001-of-00003.gguf
+      --n-gpu-layers 0 --ctx-size 16384 --threads 16 --jinja
     ttl: 600
 
-  # Workhorse fallback — Qwen3-14B on CPU (slow). Only hit when Storm is offline; the assistant
-  # queues bulk work, so this covers synchronous/interactive calls in the meantime.
-  "qwen3-14b":
+  "qwen3-14b":             # workhorse CPU fallback (GPU host offline)
     cmd: >
-      llama-server
-      --port ${PORT}
-      --model /cache/Qwen3-14B-UD-Q4_K_XL.gguf
-      --ctx-size 32768
-      --threads 20
-      --jinja
+      llama-server --port ${PORT} --model /cache/Qwen3-14B-UD-Q4_K_XL.gguf
+      --ctx-size 32768 --threads 20 --jinja
     ttl: 900
 
-  # Encoder fallback — used only if the A380 is VRAM-starved (Jellyfin pressure) or down.
-  "qwen3-embedding-0.6b":
+  "qwen3-embedding-0.6b":  # encoder fallback (GPU encoder down)
     cmd: >
-      llama-server
-      --port ${PORT}
-      --model /cache/Qwen3-Embedding-0.6B-Q8_0.gguf
-      --embeddings
-      --pooling last
-      --ctx-size 8192
-      --threads 20
+      llama-server --port ${PORT} --model /cache/Qwen3-Embedding-0.6B-Q8_0.gguf
+      --embeddings --pooling last --ctx-size 8192 --threads 20
+    ttl: 600
+
+  "qwen3-reranker-0.6b":   # reranker fallback (GPU encoder down)
+    cmd: >
+      llama-server --port ${PORT} --model /cache/qwen3-reranker-0.6b-q8_0.gguf
+      --reranking --pooling rank --ctx-size 8192 --threads 20
     ttl: 600

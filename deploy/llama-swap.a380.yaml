@@ -1,33 +1,21 @@
-# llama-swap config for the NAS Intel Arc A380 (6 GB, shared with Jellyfin transcode).
-# llama.cpp Vulkan (Mesa ANV) — switch to a SYCL build if Vulkan underperforms on the encoders.
-# Serves only small single-pass encoders so transcode keeps its VRAM. Mounted as /config.yaml.
-#
-# VRAM budget: keep total LLM use ~2 GB. Transcode uses the fixed-function media engine (not the
-# Xe-cores), so the real contention is VRAM + bandwidth, not compute — but never let the model set
-# grow into transcode's headroom. The gateway falls these models back to the CPU worker if the
-# A380 is unreachable.
-
+# Local GPU encoders (Vulkan) — embed + rerank only, ~2 GB VRAM so the GPU can be shared with
+# other workloads (e.g. video transcode). GGUFs: Qwen official embedding; ggml-org reranker.
 healthCheckTimeout: 120
 
+groups:
+  "encoders":              # embed + rerank co-resident (both single-pass, ~1.5 GB total)
+    swap: false
+    members: ["qwen3-embedding-0.6b", "qwen3-reranker-0.6b"]
+
 models:
-  # Embeddings — Qwen3-Embedding-0.6B (<1 GB). Last-token pooling per the model card.
-  # Single forward pass, no KV decode; ttl 0 = resident on the hot retrieval path.
-  "qwen3-embedding-0.6b":
+  "qwen3-embedding-0.6b":  # bi-encoder; retrieval top-K
     cmd: >
-      llama-server
-      --port ${PORT}
-      --model /cache/Qwen3-Embedding-0.6B-Q8_0.gguf
-      --embeddings
-      --pooling last
-      --n-gpu-layers 999
-      --ctx-size 8192
+      llama-server --port ${PORT} --model /cache/Qwen3-Embedding-0.6B-Q8_0.gguf
+      --embeddings --pooling last --n-gpu-layers 999 --ctx-size 8192
     ttl: 0
 
-  # Reranker (optional — add only if retrieval looks noisy). To keep it co-resident with the
-  # embedder (rather than llama-swap evicting one for the other), put both in a llama-swap
-  # group with concurrency enabled. Left commented until needed.
-  # "qwen3-reranker-0.6b":
-  #   cmd: >
-  #     llama-server --port ${PORT} --model /cache/Qwen3-Reranker-0.6B-Q8_0.gguf
-  #     --reranking --n-gpu-layers 999 --ctx-size 8192
-  #   ttl: 0
+  "qwen3-reranker-0.6b":   # cross-encoder; re-scores the top-K
+    cmd: >
+      llama-server --port ${PORT} --model /cache/qwen3-reranker-0.6b-q8_0.gguf
+      --reranking --pooling rank --n-gpu-layers 999 --ctx-size 8192
+    ttl: 0

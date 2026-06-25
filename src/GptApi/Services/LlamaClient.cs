@@ -63,6 +63,12 @@ public sealed class LlamaClient
         await PostJsonBufferedAsync("/v1/embeddings", requestJson, ct);
 
     /// <summary>
+    /// Buffered rerank (<c>/v1/rerank</c>; llama-server <c>--reranking</c>). Jina/Cohere-shape.
+    /// </summary>
+    public async Task<string> RerankAsync(string requestJson, CancellationToken ct) =>
+        await PostJsonBufferedAsync("/v1/rerank", requestJson, ct);
+
+    /// <summary>
     /// Streaming chat completion. Caller owns the returned <see cref="HttpResponseMessage"/>
     /// and is responsible for piping its content stream to the client. Headers are read
     /// eagerly so backpressure can flow end-to-end.

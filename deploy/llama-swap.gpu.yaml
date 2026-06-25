@@ -1,52 +1,23 @@
-# llama-swap config for Storm (RX 9070 XT 16 GB + Ryzen 9950X). One worker serves both the
-# GPU workhorse (Vulkan — faster than ROCm/HIP on RDNA4, no idle-power bug) and a CPU heavy
-# tier. Mounted as /config.yaml; the gateway routes `qwen3-14b` and `gpt-oss-20b` here.
-# GGUF filenames below are placeholders — match them to what you stage in the cache dir.
-#
-# Co-residency: the GPU workhorse (kept warm) and the CPU heavy tier use different hardware, so
-# they run concurrently via a `swap:false` group — neither evicts the other.
-
-# GPU load is fast (VRAM, ~5-15 s); CPU mmap of the 20B is the long pole.
+# Remote GPU host: GPU workhorse (Vulkan) + a CPU heavy tier on the same box.
+# GGUFs: Unsloth UD (Qwen3-14B); ggml-org MXFP4 (gpt-oss-20b). Stage into the host's /cache.
 healthCheckTimeout: 180
 
-# Both Storm tiers stay loaded together (different hardware — GPU vs CPU).
 groups:
-  "storm":
+  "host":                  # GPU + CPU tiers run concurrently (different hardware)
     swap: false
     members: ["qwen3-14b", "gpt-oss-20b"]
 
 models:
-  # Workhorse — Qwen3-14B Q4 (~10 GB) fits fully in 16 GB with a quantized 32k KV cache.
-  # ttl 0 = stay resident (the gateway keep-warm: never evict mid agent-loop).
-  "qwen3-14b":
+  "qwen3-14b":             # workhorse, kept warm
     cmd: >
-      llama-server
-      --port ${PORT}
-      --model /cache/Qwen3-14B-UD-Q4_K_XL.gguf
-      --n-gpu-layers 999
-      --ctx-size 32768
-      --flash-attn
-      --cache-type-k q8_0
-      --cache-type-v q8_0
-      --jinja
+      llama-server --port ${PORT} --model /cache/Qwen3-14B-UD-Q4_K_XL.gguf
+      --n-gpu-layers 999 --ctx-size 32768 --flash-attn --cache-type-k q8_0 --cache-type-v q8_0 --jinja
     ttl: 0
 
-  # Heavy quality tier — gpt-oss-20b on the 9950X CPU. MoE (~3.6B active) sidesteps the DDR5
-  # bandwidth wall; keeps the GPU free for the workhorse. On-demand, queued by the assistant.
-  "gpt-oss-20b":
+  "gpt-oss-20b":           # heavy tier on the host CPU, queued
     cmd: >
-      llama-server
-      --port ${PORT}
-      --model /cache/gpt-oss-20b-Q4_K_M.gguf
-      --n-gpu-layers 0
-      --ctx-size 32768
-      --threads 16
-      --jinja
+      llama-server --port ${PORT} --model /cache/gpt-oss-20b-mxfp4.gguf
+      --n-gpu-layers 0 --ctx-size 32768 --threads 16 --jinja
     ttl: 1800
 
-  # Vision (Phase 2, load-on-demand) — uncomment once the workhorse eval settles.
-  # "qwen3-vl-8b":
-  #   cmd: >
-  #     llama-server --port ${PORT} --model /cache/Qwen3-VL-8B-Instruct-Q4_K_M.gguf
-  #     --mmproj /cache/Qwen3-VL-8B-mmproj.gguf --n-gpu-layers 999 --ctx-size 16384 --flash-attn --jinja
-  #   ttl: 1800
+  # Vision (optional): Qwen3-VL-8B with --mmproj, load-on-demand.
