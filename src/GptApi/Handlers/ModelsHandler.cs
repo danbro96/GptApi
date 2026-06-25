@@ -12,49 +12,70 @@ public sealed class ModelsHandler
     private const string CacheKey = "worker-models";
     private static readonly TimeSpan _cacheTtl = TimeSpan.FromSeconds(60);
 
-    private readonly LlamaClient _client;
+    private readonly LlamaRouter _router;
     private readonly IMemoryCache _cache;
     private readonly JsonSerializerOptions _json;
 
     public ModelsHandler(
-        LlamaClient client,
+        LlamaRouter router,
         IMemoryCache cache,
         IOptions<Microsoft.AspNetCore.Http.Json.JsonOptions> jsonOptions)
     {
-        _client = client;
+        _router = router;
         _cache = cache;
         _json = jsonOptions.Value.SerializerOptions;
     }
 
     public async Task<Results<Ok<ModelsResponse>, ProblemHttpResult>> ListAsync(CancellationToken ct)
     {
-        string? raw;
         try
         {
-            raw = await _cache.GetOrCreateAsync(CacheKey, async entry =>
+            var union = await _cache.GetOrCreateAsync(CacheKey, async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = _cacheTtl;
-                return await _client.GetModelsAsync(ct);
+                return await FetchUnionAsync(ct);
             });
+            // GetOrCreateAsync only returns null if the factory did; FetchUnionAsync never does.
+            return TypedResults.Ok(union!);
         }
         catch (HttpRequestException)
         {
-            return TypedResults.Problem(detail: "worker unavailable", statusCode: 503);
+            // No backend answered (e.g. all workers down). Don't cache the failure.
+            return TypedResults.Problem(detail: "no backend available", statusCode: 503);
+        }
+    }
+
+    /// <summary>
+    /// Merges <c>/v1/models</c> across every configured backend, deduped by id, so the full
+    /// roster shows even though it's split across the PC GPU, A380, and CPU workers. A backend
+    /// that's down (e.g. the PC while gaming) or malformed is skipped, not fatal.
+    /// </summary>
+    private async Task<ModelsResponse> FetchUnionAsync(CancellationToken ct)
+    {
+        var byId = new Dictionary<string, ModelInfo>(StringComparer.Ordinal);
+        var anyOk = false;
+
+        foreach (var (_, client) in _router.AllBackends())
+        {
+            try
+            {
+                var raw = await client.GetModelsAsync(ct);
+                var parsed = JsonSerializer.Deserialize<ModelsResponse>(raw, _json);
+                if (parsed?.Data is null) continue;
+                anyOk = true;
+                foreach (var model in parsed.Data) byId.TryAdd(model.Id, model);
+            }
+            catch (HttpRequestException)
+            {
+                // Backend unreachable (e.g. the PC while gaming) — skip it.
+            }
+            catch (JsonException)
+            {
+                // Backend returned junk — skip it.
+            }
         }
 
-        if (string.IsNullOrEmpty(raw))
-            return TypedResults.Problem(detail: "worker returned empty model list", statusCode: 502);
-
-        try
-        {
-            var typed = JsonSerializer.Deserialize<ModelsResponse>(raw, _json);
-            return typed is null || typed.Data is null
-                ? TypedResults.Problem(detail: "worker returned malformed model list", statusCode: 502)
-                : TypedResults.Ok(typed);
-        }
-        catch (JsonException)
-        {
-            return TypedResults.Problem(detail: "worker returned malformed model list", statusCode: 502);
-        }
+        if (!anyOk) throw new HttpRequestException("no backend returned a model list");
+        return new ModelsResponse { Data = byId.Values.ToList() };
     }
 }

@@ -1,43 +1,75 @@
-# llama-swap config — proxies in front of llama-server, swaps models on demand.
-# Mounted into the gpt-worker container as /config.yaml.
-# Reference: https://github.com/mostlygeek/llama-swap
+# llama-swap config for the NAS CPU worker (Xeon Gold 6248, AVX-512, 20 cores, 128 GB DDR4).
+# Role in the split topology: always-on triage + fallback roster + the gpt-oss-120b TOP TIER.
+# The GPU hosts (Storm, A380) carry the hot paths; this worker keeps the assistant alive when
+# they're offline, and is the always-on home of the heavy quality model.
+# Mounted as /config.yaml. GGUF filenames are placeholders — match the cache dir.
 
-# Cold-load tolerance for the slowest model (Q8 mmap is the long pole).
-healthCheckTimeout: 240
+# CPU mmap of the 120B (~63 GB) is the long pole; give cold loads room.
+healthCheckTimeout: 300
+
+# Groups keep triage permanently warm while the heavy models swap among themselves:
+#  - "resident" is persistent → never evicted by a heavy load.
+#  - "heavy" has swap:true → exactly one of {120b, 14b-fallback, embed-fallback} is resident at a
+#    time (so the 120B and the 14B fallback never co-load and blow the RAM budget), and
+#    exclusive:false → loading one does NOT evict the resident triage.
+groups:
+  "resident":
+    persistent: true
+    swap: false
+    members: ["qwen3-1.7b"]
+  "heavy":
+    swap: true
+    exclusive: false
+    members: ["gpt-oss-120b", "qwen3-14b", "qwen3-embedding-0.6b"]
 
 models:
-  # Default — fast 8B dense. Loads in ~10s, ~25-40 tok/s on the Xeon. Strong tool
-  # calling and HumanEval for size; right pick for Cline / everyday chat.
-  "qwen3-8b":
+  # Triage — Qwen3-1.7B. Cheap "is this actionable?" gate run on every inbound; PC-independent.
+  # ttl 0 + the "resident" group = always warm, never swapped out by a heavy load.
+  "qwen3-1.7b":
     cmd: >
       llama-server
       --port ${PORT}
-      --model /cache/Qwen3-8B-UD-Q4_K_XL.gguf
+      --model /cache/Qwen3-1.7B-Q4_K_M.gguf
       --ctx-size 32768
       --threads 20
       --jinja
-    ttl: 1800   # unload after 30 min idle so the host can reclaim ~5 GB
+    ttl: 0
 
-  # Medium — Qwen 3.6-35B-A3B at Q4. MoE (3B active) but memory-bandwidth bound on
-  # CPU — practically ~5-10 tok/s. Pick when the 8B feels under-powered.
-  "qwen3.6-35b-a3b-q4":
+  # Top quality tier — gpt-oss-120b (117B / ~5.1B active MoE, ~63 GB MXFP4), pure-CPU. Always-on
+  # home (NAS is 24/7), load-on-demand: committed only during a batch then idle-unloads. Thread-
+  # limited to leave cores for Jellyfin/Nextcloud/gateway. RAM while running ~66-70 GB — keep
+  # zfs_arc_max capped (~32 GB) on the host so ARC doesn't collide. ~10-15 tok/s @ 4ch DDR4-2400.
+  "gpt-oss-120b":
     cmd: >
       llama-server
       --port ${PORT}
-      --model /cache/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
-      --ctx-size 32768
-      --threads 20
+      --model /cache/gpt-oss-120b-MXFP4.gguf
+      --n-gpu-layers 0
+      --ctx-size 16384
+      --threads 16
       --jinja
-    ttl: 1800   # unload after 30 min idle so the host can reclaim ~22 GB
+    ttl: 600
 
-  # Heavy, on-demand. Lossless quantization; pick for hard questions or final
-  # refactors where peak quality matters.
-  "qwen3.6-35b-a3b-q8":
+  # Workhorse fallback — Qwen3-14B on CPU (slow). Only hit when Storm is offline; the assistant
+  # queues bulk work, so this covers synchronous/interactive calls in the meantime.
+  "qwen3-14b":
     cmd: >
       llama-server
       --port ${PORT}
-      --model /cache/Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf
+      --model /cache/Qwen3-14B-UD-Q4_K_XL.gguf
       --ctx-size 32768
       --threads 20
       --jinja
-    ttl: 1800
+    ttl: 900
+
+  # Encoder fallback — used only if the A380 is VRAM-starved (Jellyfin pressure) or down.
+  "qwen3-embedding-0.6b":
+    cmd: >
+      llama-server
+      --port ${PORT}
+      --model /cache/Qwen3-Embedding-0.6B-Q8_0.gguf
+      --embeddings
+      --pooling last
+      --ctx-size 8192
+      --threads 20
+    ttl: 600

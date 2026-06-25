@@ -4,7 +4,6 @@ using GptApi.Handlers;
 using GptApi.Models;
 using GptApi.Services;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -22,15 +21,22 @@ builder.Services.Configure<ApiKeyAuthOptions>(builder.Configuration.GetSection("
 
 builder.Services.AddMemoryCache();
 
-builder.Services.AddHttpClient<LlamaClient>((sp, http) =>
+// One HttpClient per worker backend (PC GPU, NAS A380, NAS CPU). LlamaRouter resolves a
+// request's model to a backend and runs the call with transport-level failover.
+var llamaOptions = builder.Configuration.GetSection("Llama").Get<LlamaOptions>() ?? new LlamaOptions();
+foreach (var backend in llamaOptions.EffectiveBackends())
 {
-    var opts = sp.GetRequiredService<IOptions<LlamaOptions>>().Value;
-    http.BaseAddress = new Uri(opts.WorkerUrl);
-    http.Timeout = TimeSpan.FromSeconds(opts.RequestTimeoutSeconds);
-});
+    builder.Services.AddHttpClient(LlamaRouter.ClientName(backend.Name), http =>
+    {
+        http.BaseAddress = new Uri(backend.Url);
+        http.Timeout = TimeSpan.FromSeconds(llamaOptions.RequestTimeoutSeconds);
+    });
+}
+builder.Services.AddSingleton<LlamaRouter>();
 
 builder.Services.AddScoped<ChatHandler>();
 builder.Services.AddScoped<ModelsHandler>();
+builder.Services.AddScoped<EmbeddingsHandler>();
 
 // Liveness (/livez) + readiness (/readyz, pings the llama-server worker) probes.
 builder.Services.AddAppHealthChecks();
@@ -179,6 +185,7 @@ app.MapAppHealthChecks(app.Environment);
 app.MapModelsEndpoint().RequireAuthorization();
 app.MapChatCompletions().RequireAuthorization();
 app.MapCompletions().RequireAuthorization();
+app.MapEmbeddings().RequireAuthorization();
 
 app.Run();
 

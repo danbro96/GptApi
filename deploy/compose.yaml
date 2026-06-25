@@ -1,13 +1,45 @@
-# Reference Compose for GptApi — gpt-api (.NET frontend) + gpt-worker (llama-swap).
-# Every host, port, and URL below is an overridable ${VAR:-default} sample from the maintainer's
-# deployment — override them for your environment (see deploy/.env.example). Values marked :?required must be set.
-# Model list / GGUF filenames / per-model flags live in deploy/llama-swap.yaml.
+# Reference Compose for GptApi — gpt-api (.NET gateway) + two NAS-local workers.
+# The gateway routes each request's `model` to a backend (see Llama__Routes below):
+#   storm  → Storm (RX 9070 XT + 9950X CPU), a SEPARATE host reached by URL — not a container here.
+#            One llama-swap there serves the GPU workhorse and the CPU heavy tier.
+#   nasGpu → gpt-worker-a380 (Intel A380, llama.cpp Vulkan) — light encoders, 24/7.
+#   nasCpu → gpt-worker (CPU)  — triage + the workhorse fallback when Storm is offline.
+# Every host/port/URL is an overridable ${VAR:-default}; values marked :?required must be set.
+# Model lists / GGUF filenames / per-model flags live in the deploy/llama-swap*.yaml files.
 services:
   gpt-api:
     image: danbro96/gpt-api:${IMAGE_TAG:-latest}
     container_name: gpt-api
     environment:
-      Llama__WorkerUrl: http://gpt-worker:9000
+      # --- Worker backends (name → URL) ---
+      Llama__Backends__0__Name: storm
+      Llama__Backends__0__Url: ${STORM_WORKER_URL:-http://192.168.14.108:9000}
+      Llama__Backends__1__Name: nasGpu
+      Llama__Backends__1__Url: http://gpt-worker-a380:9000
+      Llama__Backends__2__Name: nasCpu
+      Llama__Backends__2__Url: http://gpt-worker:9000
+      # Always-on backend for unrouted model ids + the readiness probe.
+      Llama__DefaultBackend: nasCpu
+      # --- Per-model routing (Model → Backend [+ Fallback on transport failure]) ---
+      Llama__Routes__0__Model: qwen3-14b
+      Llama__Routes__0__Backend: storm
+      Llama__Routes__0__Fallback: nasCpu
+      Llama__Routes__1__Model: qwen3-embedding-0.6b
+      Llama__Routes__1__Backend: nasGpu
+      Llama__Routes__1__Fallback: nasCpu
+      Llama__Routes__2__Model: qwen3-reranker-0.6b
+      Llama__Routes__2__Backend: nasGpu
+      Llama__Routes__2__Fallback: nasCpu
+      Llama__Routes__3__Model: qwen3-1.7b
+      Llama__Routes__3__Backend: nasCpu
+      # Heavy quality tier on Storm's 9950X CPU (MoE, queued). No fallback — when Storm is
+      # offline the assistant queues heavy work rather than running 20B on the NAS.
+      Llama__Routes__4__Model: gpt-oss-20b
+      Llama__Routes__4__Backend: storm
+      # Top quality tier — gpt-oss-120b on the always-on NAS Xeon (pure-CPU, load-on-demand).
+      # No fallback; it IS the always-available tier.
+      Llama__Routes__5__Model: gpt-oss-120b
+      Llama__Routes__5__Backend: nasCpu
       Llama__RequestTimeoutSeconds: ${REQUEST_TIMEOUT:-300}
       Auth__ApiKeys__0__Key: ${GPT_API_KEY:?required}
       Auth__ApiKeys__0__Name: ${GPT_API_KEY_NAME:-prod}
@@ -26,6 +58,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    # Only the always-on CPU worker gates startup. A GPU worker being down (Storm gaming,
+    # A380 not yet up) must NOT block the gateway — the router fails over.
     depends_on:
       gpt-worker:
         condition: service_healthy
@@ -35,9 +69,8 @@ services:
       - medelynas_telemetry
 
   gpt-worker:
-    # llama-swap proxies in front of llama-server, loading/unloading models on
-    # demand so only one is resident at a time. The :cpu image bundles a CPU build
-    # of llama-server. Models declared in llama-swap.yaml.
+    # CPU llama-swap: triage (qwen3-1.7b, kept resident) + the workhorse fallback
+    # (qwen3-14b, slow) + CPU copies of the encoders for A380-pressure failover.
     image: ghcr.io/mostlygeek/llama-swap:cpu
     container_name: gpt-worker
     command:
@@ -53,8 +86,33 @@ services:
       interval: 60s
       timeout: 5s
       retries: 5
-      # llama-swap itself starts in <1s; the model-load wait happens on first
-      # request, gated by healthCheckTimeout in llama-swap.yaml.
+      start_period: 30s
+    restart: unless-stopped
+
+  gpt-worker-a380:
+    # Intel Arc A380 llama-swap, Vulkan backend — serves only the small encoders
+    # (embed/rerank, ~2 GB VRAM) so Jellyfin transcode keeps its share of the 6 GB.
+    # Image must bundle a Vulkan llama-server build; verify the exact tag for your setup.
+    image: ${A380_WORKER_IMAGE:-ghcr.io/mostlygeek/llama-swap:vulkan}
+    container_name: gpt-worker-a380
+    command:
+      - "-config"
+      - "/config.yaml"
+      - "-listen"
+      - "0.0.0.0:9000"
+    devices:
+      - /dev/dri:/dev/dri          # shared with Jellyfin; the A380 is the only GPU here
+    group_add:
+      - video
+      - render                     # use the numeric render gid if the name doesn't resolve
+    volumes:
+      - /mnt/tank2/appdata/gpt_api/cache:/cache
+      - /mnt/tank2/appdata/gpt_api/llama-swap.a380.yaml:/config.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/health || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 5
       start_period: 30s
     restart: unless-stopped
 

@@ -12,52 +12,54 @@ public sealed class ChatHandler
 {
     private static readonly ActivitySource _activitySource = new("GptApi.Chat");
 
-    private readonly LlamaClient _client;
+    private readonly LlamaRouter _router;
     private readonly ILogger<ChatHandler> _log;
-    private readonly LlamaOptions _options;
     private readonly JsonSerializerOptions _json;
 
     public ChatHandler(
-        LlamaClient client,
+        LlamaRouter router,
         ILogger<ChatHandler> log,
-        IOptions<LlamaOptions> options,
         IOptions<Microsoft.AspNetCore.Http.Json.JsonOptions> jsonOptions)
     {
-        _client = client;
+        _router = router;
         _log = log;
-        _options = options.Value;
         _json = jsonOptions.Value.SerializerOptions;
     }
 
     public Task<Results<Ok<ChatCompletionResponse>, ProblemHttpResult, EmptyHttpResult>>
         ChatAsync(ChatCompletionRequest req, HttpContext ctx, CancellationToken ct) =>
         DispatchAsync<ChatCompletionRequest, ChatCompletionResponse>(
-            req, "chat.completion", ctx,
-            buffered: _client.ChatCompletionAsync,
-            streaming: _client.StreamChatCompletionAsync,
+            req, req.Model, "chat.completion", ctx,
+            buffered: (client, json, c) => client.ChatCompletionAsync(json, c),
+            streaming: (client, json, c) => client.StreamChatCompletionAsync(json, c),
             ct);
 
     public Task<Results<Ok<CompletionResponse>, ProblemHttpResult, EmptyHttpResult>>
         CompletionAsync(CompletionRequest req, HttpContext ctx, CancellationToken ct) =>
         DispatchAsync<CompletionRequest, CompletionResponse>(
-            req, "text.completion", ctx,
-            buffered: _client.CompletionAsync,
-            streaming: _client.StreamCompletionAsync,
+            req, req.Model, "text.completion", ctx,
+            buffered: (client, json, c) => client.CompletionAsync(json, c),
+            streaming: (client, json, c) => client.StreamCompletionAsync(json, c),
             ct);
 
     private async Task<Results<Ok<TResponse>, ProblemHttpResult, EmptyHttpResult>>
         DispatchAsync<TRequest, TResponse>(
             TRequest req,
+            string model,
             string activityName,
             HttpContext ctx,
-            Func<string, CancellationToken, Task<string>> buffered,
-            Func<string, CancellationToken, Task<HttpResponseMessage>> streaming,
+            Func<LlamaClient, string, CancellationToken, Task<string>> buffered,
+            Func<LlamaClient, string, CancellationToken, Task<HttpResponseMessage>> streaming,
             CancellationToken ct)
         where TRequest : class
         where TResponse : class
     {
         var validation = Validate(req);
         if (validation is not null) return validation;
+
+        var pair = _router.Resolve(model);
+        if (pair is null)
+            return TypedResults.Problem(detail: $"model '{model}' has no configured backend", statusCode: 400);
 
         using var activity = _activitySource.StartActivity(activityName);
         ApplyRequestTags(activity, req);
@@ -69,7 +71,8 @@ public sealed class ChatHandler
         {
             if (IsStreaming(req))
             {
-                using var workerResponse = await streaming(requestJson, ct);
+                using var workerResponse = await _router.InvokeAsync(
+                    pair, c => streaming(c, requestJson, ct), activity);
                 ctx.Response.ContentType = "text/event-stream";
                 ctx.Response.Headers.CacheControl = "no-cache";
                 ctx.Response.Headers["X-Accel-Buffering"] = "no";
@@ -81,7 +84,8 @@ public sealed class ChatHandler
                 return TypedResults.Empty;
             }
 
-            var responseJson = await buffered(requestJson, ct);
+            var responseJson = await _router.InvokeAsync(
+                pair, c => buffered(c, requestJson, ct), activity);
             var typed = JsonSerializer.Deserialize<TResponse>(responseJson, _json)
                 ?? throw new JsonException("worker returned null");
 
