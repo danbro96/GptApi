@@ -55,14 +55,24 @@ builder.Services.AddAuthorization();
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    var permitsPerMinute = builder.Configuration.GetValue("RateLimit:RequestsPerMinute", 30);
+    var defaultRpm = builder.Configuration.GetValue("RateLimit:RequestsPerMinute", 30);
+    var authConfig = builder.Configuration.GetSection("Auth").Get<ApiKeyAuthOptions>() ?? new();
+    // Each key's own requests/min budget (falls back to the global default), so assistant / mtg /
+    // demos get independent buckets and one busy consumer can't starve the others.
+    var rpmByName = authConfig.ApiKeys
+        .Where(k => !string.IsNullOrEmpty(k.Name))
+        .GroupBy(k => k.Name, StringComparer.Ordinal)
+        .ToDictionary(g => g.Key, g => g.Last().RequestsPerMinute ?? defaultRpm, StringComparer.Ordinal);
+
     o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
     {
-        var key = ctx.User.Identity?.Name ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "anon";
+        var name = ctx.User.Identity?.Name;
+        var key = name ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "anon";
+        var limit = name is not null && rpmByName.TryGetValue(name, out var rpm) ? rpm : defaultRpm;
         return RateLimitPartition.GetTokenBucketLimiter(key, _ => new TokenBucketRateLimiterOptions
         {
-            TokenLimit = permitsPerMinute,
-            TokensPerPeriod = permitsPerMinute,
+            TokenLimit = limit,
+            TokensPerPeriod = limit,
             ReplenishmentPeriod = TimeSpan.FromMinutes(1),
             QueueLimit = 0,
             AutoReplenishment = true,

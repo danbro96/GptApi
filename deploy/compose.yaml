@@ -49,7 +49,20 @@ services:
       Llama__RequestTimeoutSeconds: ${REQUEST_TIMEOUT:-300}
       Auth__ApiKeys__0__Key: ${GPT_API_KEY:?required}
       Auth__ApiKeys__0__Name: ${GPT_API_KEY_NAME:-prod}
+      # Per-key quotas (optional; omit to use the RateLimit__RequestsPerMinute fallback below).
+      # Priority is recorded for observability; cross-key scheduling is a llama-swap follow-up.
+      #   Auth__ApiKeys__0__RequestsPerMinute: 120
+      #   Auth__ApiKeys__0__Priority: high            # Low | Normal | High
+      #   Auth__ApiKeys__0__DailyTokenBudget: 20000000
+      # Add more keys, each with its own quota, so consumers don't starve each other:
+      #   Auth__ApiKeys__1__Key: ${MTG_API_KEY}
+      #   Auth__ApiKeys__1__Name: mtg
+      #   Auth__ApiKeys__1__RequestsPerMinute: 60
+      #   Auth__ApiKeys__2__Key: ${DEMOS_API_KEY}
+      #   Auth__ApiKeys__2__Name: demos
+      #   Auth__ApiKeys__2__RequestsPerMinute: 20
       Auth__AllowedOrigins__0: ${ALLOWED_ORIGIN:-}
+      # Fallback requests/min for any key without its own Auth__ApiKeys__N__RequestsPerMinute.
       RateLimit__RequestsPerMinute: ${RATE_LIMIT:-30}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}

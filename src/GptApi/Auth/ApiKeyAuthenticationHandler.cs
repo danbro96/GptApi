@@ -33,6 +33,7 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
         {
             new Claim(ClaimTypes.Name, match.Name),
             new Claim("api_key_name", match.Name),
+            new Claim("api_key_priority", match.Priority.ToString()),
         };
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);
