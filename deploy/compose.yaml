@@ -38,6 +38,14 @@ services:
       # Top tier — gpt-oss-120b on the always-on CPU host (pure-CPU, load-on-demand). No fallback.
       Llama__Routes__5__Model: gpt-oss-120b
       Llama__Routes__5__Backend: nasCpu
+      # --- Named tier aliases (caller-facing name → concrete model id) ---
+      # Callers pick a semantic tier; the gateway rewrites it to the GGUF id before routing, so a
+      # tier can be re-pointed here without touching consumers. (Defaults also ship in appsettings.json.)
+      Llama__Aliases__assistant-fast: qwen3-1.7b
+      Llama__Aliases__assistant-reasoning: gpt-oss-120b
+      Llama__Aliases__assistant-balanced: qwen3-14b
+      Llama__Aliases__embed: qwen3-embedding-0.6b
+      Llama__Aliases__rerank: qwen3-reranker-0.6b
       Llama__RequestTimeoutSeconds: ${REQUEST_TIMEOUT:-300}
       Auth__ApiKeys__0__Key: ${GPT_API_KEY:?required}
       Auth__ApiKeys__0__Name: ${GPT_API_KEY_NAME:-prod}

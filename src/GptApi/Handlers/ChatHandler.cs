@@ -13,34 +13,43 @@ public sealed class ChatHandler
     private static readonly ActivitySource _activitySource = new("GptApi.Chat");
 
     private readonly LlamaRouter _router;
+    private readonly ModelAliasResolver _aliases;
     private readonly ILogger<ChatHandler> _log;
     private readonly JsonSerializerOptions _json;
 
     public ChatHandler(
         LlamaRouter router,
+        ModelAliasResolver aliases,
         ILogger<ChatHandler> log,
         IOptions<Microsoft.AspNetCore.Http.Json.JsonOptions> jsonOptions)
     {
         _router = router;
+        _aliases = aliases;
         _log = log;
         _json = jsonOptions.Value.SerializerOptions;
     }
 
     public Task<Results<Ok<ChatCompletionResponse>, ProblemHttpResult, EmptyHttpResult>>
-        ChatAsync(ChatCompletionRequest req, HttpContext ctx, CancellationToken ct) =>
-        DispatchAsync<ChatCompletionRequest, ChatCompletionResponse>(
+        ChatAsync(ChatCompletionRequest req, HttpContext ctx, CancellationToken ct)
+    {
+        req.Model = _aliases.Resolve(req.Model);
+        return DispatchAsync<ChatCompletionRequest, ChatCompletionResponse>(
             req, req.Model, "chat.completion", ctx,
             buffered: (client, json, c) => client.ChatCompletionAsync(json, c),
             streaming: (client, json, c) => client.StreamChatCompletionAsync(json, c),
             ct);
+    }
 
     public Task<Results<Ok<CompletionResponse>, ProblemHttpResult, EmptyHttpResult>>
-        CompletionAsync(CompletionRequest req, HttpContext ctx, CancellationToken ct) =>
-        DispatchAsync<CompletionRequest, CompletionResponse>(
+        CompletionAsync(CompletionRequest req, HttpContext ctx, CancellationToken ct)
+    {
+        req.Model = _aliases.Resolve(req.Model);
+        return DispatchAsync<CompletionRequest, CompletionResponse>(
             req, req.Model, "text.completion", ctx,
             buffered: (client, json, c) => client.CompletionAsync(json, c),
             streaming: (client, json, c) => client.StreamCompletionAsync(json, c),
             ct);
+    }
 
     private async Task<Results<Ok<TResponse>, ProblemHttpResult, EmptyHttpResult>>
         DispatchAsync<TRequest, TResponse>(

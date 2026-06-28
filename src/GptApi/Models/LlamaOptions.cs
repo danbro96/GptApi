@@ -19,6 +19,13 @@ public sealed class LlamaOptions
     public List<ModelRoute> Routes { get; set; } = new();
 
     /// <summary>
+    /// Semantic tier aliases: a caller-facing name (e.g. <c>assistant-fast</c>) → a concrete model
+    /// id, resolved before routing so a tier can be re-pointed without touching consumers. A model
+    /// id that matches no alias is used as-is.
+    /// </summary>
+    public Dictionary<string, string> Aliases { get; set; } = new();
+
+    /// <summary>
     /// Backend for model ids with no explicit route. Must be an always-on backend.
     /// </summary>
     public string? DefaultBackend { get; set; }

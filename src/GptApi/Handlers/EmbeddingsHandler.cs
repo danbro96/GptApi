@@ -13,15 +13,18 @@ public sealed class EmbeddingsHandler
     private static readonly ActivitySource _activitySource = new("GptApi.Chat");
 
     private readonly LlamaRouter _router;
+    private readonly ModelAliasResolver _aliases;
     private readonly ILogger<EmbeddingsHandler> _log;
     private readonly JsonSerializerOptions _json;
 
     public EmbeddingsHandler(
         LlamaRouter router,
+        ModelAliasResolver aliases,
         ILogger<EmbeddingsHandler> log,
         IOptions<Microsoft.AspNetCore.Http.Json.JsonOptions> jsonOptions)
     {
         _router = router;
+        _aliases = aliases;
         _log = log;
         _json = jsonOptions.Value.SerializerOptions;
     }
@@ -29,6 +32,7 @@ public sealed class EmbeddingsHandler
     public async Task<Results<Ok<EmbeddingsResponse>, ProblemHttpResult>> EmbedAsync(
         EmbeddingsRequest req, CancellationToken ct)
     {
+        req.Model = _aliases.Resolve(req.Model);
         if (string.IsNullOrWhiteSpace(req.Model))
             return TypedResults.Problem(detail: "model is required", statusCode: 400);
         if (req.Input.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)

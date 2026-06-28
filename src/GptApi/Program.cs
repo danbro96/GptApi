@@ -33,6 +33,7 @@ foreach (var backend in llamaOptions.EffectiveBackends())
     });
 }
 builder.Services.AddSingleton<LlamaRouter>();
+builder.Services.AddSingleton<ModelAliasResolver>();
 
 builder.Services.AddScoped<ChatHandler>();
 builder.Services.AddScoped<ModelsHandler>();

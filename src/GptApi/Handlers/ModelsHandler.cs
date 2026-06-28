@@ -13,15 +13,18 @@ public sealed class ModelsHandler
     private static readonly TimeSpan _cacheTtl = TimeSpan.FromSeconds(60);
 
     private readonly LlamaRouter _router;
+    private readonly ModelAliasResolver _aliases;
     private readonly IMemoryCache _cache;
     private readonly JsonSerializerOptions _json;
 
     public ModelsHandler(
         LlamaRouter router,
+        ModelAliasResolver aliases,
         IMemoryCache cache,
         IOptions<Microsoft.AspNetCore.Http.Json.JsonOptions> jsonOptions)
     {
         _router = router;
+        _aliases = aliases;
         _cache = cache;
         _json = jsonOptions.Value.SerializerOptions;
     }
@@ -48,7 +51,8 @@ public sealed class ModelsHandler
     /// <summary>
     /// Merges <c>/v1/models</c> across every configured backend, deduped by id, so the full
     /// roster shows even though it's split across the PC GPU, A380, and CPU workers. A backend
-    /// that's down (e.g. the PC while gaming) or malformed is skipped, not fatal.
+    /// that's down (e.g. the PC while gaming) or malformed is skipped, not fatal. The configured
+    /// tier aliases are advertised alongside the backend-reported models.
     /// </summary>
     private async Task<ModelsResponse> FetchUnionAsync(CancellationToken ct)
     {
@@ -76,6 +80,10 @@ public sealed class ModelsHandler
         }
 
         if (!anyOk) throw new HttpRequestException("no backend returned a model list");
+
+        foreach (var alias in _aliases.Aliases.Keys)
+            byId.TryAdd(alias, new ModelInfo { Id = alias, OwnedBy = "alias" });
+
         return new ModelsResponse { Data = byId.Values.ToList() };
     }
 }

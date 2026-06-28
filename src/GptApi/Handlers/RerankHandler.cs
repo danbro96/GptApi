@@ -13,15 +13,18 @@ public sealed class RerankHandler
     private static readonly ActivitySource _activitySource = new("GptApi.Chat");
 
     private readonly LlamaRouter _router;
+    private readonly ModelAliasResolver _aliases;
     private readonly ILogger<RerankHandler> _log;
     private readonly JsonSerializerOptions _json;
 
     public RerankHandler(
         LlamaRouter router,
+        ModelAliasResolver aliases,
         ILogger<RerankHandler> log,
         IOptions<Microsoft.AspNetCore.Http.Json.JsonOptions> jsonOptions)
     {
         _router = router;
+        _aliases = aliases;
         _log = log;
         _json = jsonOptions.Value.SerializerOptions;
     }
@@ -29,6 +32,7 @@ public sealed class RerankHandler
     public async Task<Results<Ok<RerankResponse>, ProblemHttpResult>> RerankAsync(
         RerankRequest req, CancellationToken ct)
     {
+        req.Model = _aliases.Resolve(req.Model);
         if (string.IsNullOrWhiteSpace(req.Model))
             return TypedResults.Problem(detail: "model is required", statusCode: 400);
         if (string.IsNullOrWhiteSpace(req.Query))
