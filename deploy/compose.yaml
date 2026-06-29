@@ -122,8 +122,8 @@ services:
     devices:
       - /dev/dri:/dev/dri          # the GPU; share it with other GPU workloads
     group_add:
-      - video
-      - render                     # use the numeric render gid if the name doesn't resolve
+      - video                                                    # static GID 44 in Debian base — resolves in-image
+      - ${RENDER_GID:?run: stat -c %g /dev/dri/renderD128 on the host}   # dynamic GID, absent in-image — must be numeric
     volumes:
       - ${CACHE_DIR:-./cache}:/cache
       - ${ENCODER_CONFIG:-./llama-swap.a380.yaml}:/config.yaml:ro
