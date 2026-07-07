@@ -1,5 +1,6 @@
 using GptApi.Models;
 using GptApi.Services;
+using GptApi.Validation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
@@ -14,17 +15,20 @@ public sealed class ChatHandler
 
     private readonly LlamaRouter _router;
     private readonly ModelAliasResolver _aliases;
+    private readonly LlamaOptions _llama;
     private readonly ILogger<ChatHandler> _log;
     private readonly JsonSerializerOptions _json;
 
     public ChatHandler(
         LlamaRouter router,
         ModelAliasResolver aliases,
+        IOptions<LlamaOptions> llamaOptions,
         ILogger<ChatHandler> log,
         IOptions<Microsoft.AspNetCore.Http.Json.JsonOptions> jsonOptions)
     {
         _router = router;
         _aliases = aliases;
+        _llama = llamaOptions.Value;
         _log = log;
         _json = jsonOptions.Value.SerializerOptions;
     }
@@ -99,6 +103,23 @@ public sealed class ChatHandler
                 ?? throw new JsonException("worker returned null");
 
             ApplyResponseTags(activity, typed);
+
+            // Layer-2 enforcement: a chat request that pinned a json_schema must come back conforming.
+            // Completions and schema-less chat pass through; streaming never reaches here.
+            if (_llama.EnforceResponseSchema
+                && req is ChatCompletionRequest chatReq
+                && typed is ChatCompletionResponse chatResp
+                && TryGetJsonSchema(chatReq, out var schema))
+            {
+                var verdict = ResponseSchemaValidator.Validate(chatResp, schema);
+                if (!verdict.Ok)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, verdict.Error);
+                    _log.LogWarning("Worker output failed schema validation for {Activity}: {Error}", activityName, verdict.Error);
+                    return TypedResults.Problem(detail: $"worker output failed schema validation: {verdict.Error}", statusCode: 502);
+                }
+            }
+
             activity?.SetTag("elapsed_ms", sw.ElapsedMilliseconds);
             return TypedResults.Ok(typed);
         }
@@ -149,6 +170,21 @@ public sealed class ChatHandler
             CompletionRequest p => p.Stream,
             _ => false,
         };
+
+    /// <summary>The caller's schema from <c>response_format: {type:"json_schema", json_schema:{schema:…}}</c>,
+    /// if present. Rides in the request's extension bag (no typed property).</summary>
+    private static bool TryGetJsonSchema(ChatCompletionRequest req, out JsonElement schema)
+    {
+        schema = default;
+        return req.AdditionalProperties is { } extra
+            && extra.TryGetValue("response_format", out var rf)
+            && rf.ValueKind == JsonValueKind.Object
+            && rf.TryGetProperty("type", out var type)
+            && type.ValueKind == JsonValueKind.String
+            && type.GetString() == "json_schema"
+            && rf.TryGetProperty("json_schema", out var js)
+            && js.TryGetProperty("schema", out schema);
+    }
 
     private static void ApplyRequestTags<TRequest>(Activity? activity, TRequest req)
         where TRequest : class

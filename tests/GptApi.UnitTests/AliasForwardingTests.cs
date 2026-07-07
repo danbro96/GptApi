@@ -59,7 +59,7 @@ public class AliasForwardingTests
         var (handler, stub) = Build(
             AliasOptions(),
             """{"id":"x","object":"chat.completion","created":0,"model":"qwen3-1.7b","choices":[]}""",
-            (r, a) => new ChatHandler(r, a, NullLogger<ChatHandler>.Instance, TestJson.Options()));
+            (r, a) => new ChatHandler(r, a, Options.Create(new LlamaOptions()), NullLogger<ChatHandler>.Instance, TestJson.Options()));
 
         var req = new ChatCompletionRequest
         {
@@ -78,7 +78,7 @@ public class AliasForwardingTests
         var (handler, stub) = Build(
             AliasOptions(),
             """{"id":"x","object":"chat.completion","created":0,"model":"qwen3-14b","choices":[]}""",
-            (r, a) => new ChatHandler(r, a, NullLogger<ChatHandler>.Instance, TestJson.Options()));
+            (r, a) => new ChatHandler(r, a, Options.Create(new LlamaOptions()), NullLogger<ChatHandler>.Instance, TestJson.Options()));
 
         var req = new ChatCompletionRequest
         {
@@ -97,7 +97,7 @@ public class AliasForwardingTests
         var (handler, _) = Build(
             TwoBackendsNoDefault(),
             "{}",
-            (r, a) => new ChatHandler(r, a, NullLogger<ChatHandler>.Instance, TestJson.Options()));
+            (r, a) => new ChatHandler(r, a, Options.Create(new LlamaOptions()), NullLogger<ChatHandler>.Instance, TestJson.Options()));
 
         var req = new ChatCompletionRequest
         {

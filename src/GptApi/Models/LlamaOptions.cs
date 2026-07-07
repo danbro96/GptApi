@@ -6,6 +6,11 @@ public sealed class LlamaOptions
 
     public int RequestTimeoutSeconds { get; set; } = 300;
 
+    /// <summary>When true, a chat response carrying <c>response_format.json_schema</c> is validated against
+    /// that schema before returning; non-conforming worker output becomes a 502. Defense-in-depth behind the
+    /// worker's own grammar-constrained decoding.</summary>
+    public bool EnforceResponseSchema { get; set; } = true;
+
     /// <summary>
     /// Named worker backends (one llama-swap / llama-server each). The gateway routes a
     /// request's <c>model</c> to one of these via <see cref="Routes"/>.

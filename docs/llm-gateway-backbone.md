@@ -15,6 +15,7 @@ A real gateway over multiple llama-swap workers:
 - **Named tier aliases** (`Models/LlamaOptions.cs`: `Aliases`): a caller-facing tier name resolves to a concrete model id *before* routing, so consumers don't hard-code GGUF ids and a model can be re-pointed in config; advertised on `/v1/models`.
 - **Roster across backends:** `qwen3-1.7b` (triage, **always-warm resident**, runs on every inbound) · `qwen3-14b` (workhorse generation/orchestration, GPU-host→CPU fallback, proven OpenAI tool-calls via `--jinja`) · `gpt-oss-120b` (top reasoning, CPU MoE, load-on-demand) · `qwen3-embedding-0.6b` · `qwen3-reranker-0.6b` — encoders on the **Arc A380** (Vulkan, ~2 GB) with CPU fallback.
 - **Swap discipline:** llama-swap `groups` keep triage resident while the heavy models swap among themselves without evicting it (`deploy/llama-swap.yaml`).
+- **Structured-output enforcement:** a chat request carrying `response_format: {type:"json_schema", …}` has its worker output validated against that schema server-side before returning; a non-conforming (or non-JSON) body is a **502** (`Validation/ResponseSchemaValidator.cs`, `JsonSchema.Net`). Defense-in-depth behind the worker's own grammar-constrained decoding (`--jinja`). Non-streaming only (streaming byte-pipes); gated by `Llama:EnforceResponseSchema` (default on).
 
 ## The gateway role — owns vs delegates
 
@@ -29,11 +30,11 @@ flowchart LR
   A380 -. fallback .-> CPU
 ```
 
-**Gateway owns** (infra cross-cutting): per-model routing + failover · kept-warm/swap policy (`groups`) · embeddings + rerank · named tier aliases · per-key quotas + priority · observability.
+**Gateway owns** (infra cross-cutting): per-model routing + failover · kept-warm/swap policy (`groups`) · embeddings + rerank · named tier aliases · per-key quotas + priority · **structured-output schema enforcement** · observability.
 **Stays in assistant-api** (product logic): prompts, tool-calling loops, conversation/memory, *which tier a task needs* (the caller picks), and **per-user isolation** — the model is stateless per request, so never mixing two users in one prompt is the assistant's job. The gateway only sees keys, not users.
 
 ## What needs implementing
-The backbone is complete — `/v1/embeddings` ✅, `/v1/rerank` ✅, per-model routing + failover ✅, kept-warm triage via `groups` ✅, named tier aliases ✅, per-key quotas + priority ✅. Follow-ups:
+The backbone is complete — `/v1/embeddings` ✅, `/v1/rerank` ✅, per-model routing + failover ✅, kept-warm triage via `groups` ✅, named tier aliases ✅, per-key quotas + priority ✅, structured-output schema enforcement ✅. Follow-ups:
 
 - **Cross-key contention scheduling** — making the latency-sensitive triage tier win under load needs llama-swap-level scheduling. The gateway records each key's `Priority`, but the ASP.NET rate limiter only arbitrates within a single key's own partition, not across keys.
 - **Daily token-budget enforcement** — `Auth:ApiKeys[].DailyTokenBudget` is a config surface today; enforcing it needs a stateful per-key/day token counter (read from response usage), deferred to keep the per-key requests/min limiter focused.
