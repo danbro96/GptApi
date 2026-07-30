@@ -1,4 +1,4 @@
-﻿namespace GptApi.Models;
+namespace GptApi.Models;
 
 public sealed class ChatCompletionUsage
 {

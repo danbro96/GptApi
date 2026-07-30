@@ -1,4 +1,7 @@
-﻿using GptApi.Auth;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using GptApi.Auth;
 using GptApi.Endpoints;
 using GptApi.Handlers;
 using GptApi.Models;
@@ -10,9 +13,6 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +32,7 @@ foreach (var backend in llamaOptions.EffectiveBackends())
         http.Timeout = TimeSpan.FromSeconds(llamaOptions.RequestTimeoutSeconds);
     });
 }
+
 builder.Services.AddSingleton<LlamaRouter>();
 builder.Services.AddSingleton<ModelAliasResolver>();
 

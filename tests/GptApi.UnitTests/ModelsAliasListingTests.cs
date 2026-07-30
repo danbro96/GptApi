@@ -34,7 +34,7 @@ public class ModelsAliasListingTests
 
         var result = await handler.ListAsync(default);
 
-        var ok = Assert.IsType<Ok<ModelsResponse>>(((INestedHttpResult)result).Result);
+        var ok = Assert.IsType<Ok<ModelsResponse>>(((INestedHttpResult) result).Result);
         var ids = ok.Value!.Data.Select(m => m.Id).ToHashSet();
         Assert.Contains("qwen3-1.7b", ids);          // backend-reported
         Assert.Contains("assistant-fast", ids);      // alias

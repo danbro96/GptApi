@@ -53,6 +53,7 @@ public class ResponseSchemaValidationTests
             });
             req.AdditionalProperties = new() { ["response_format"] = rf };
         }
+
         return req;
     }
 

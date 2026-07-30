@@ -1,11 +1,11 @@
+using System.Diagnostics;
+using System.Net;
+using System.Text.Json;
 using GptApi.Models;
 using GptApi.Services;
 using GptApi.Validation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
-using System.Diagnostics;
-using System.Net;
-using System.Text.Json;
 
 namespace GptApi.Handlers;
 
