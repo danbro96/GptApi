@@ -13,6 +13,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -187,6 +188,16 @@ if (!string.IsNullOrWhiteSpace(otlpEndpoint))
 }
 
 var app = builder.Build();
+
+// Behind the Cloudflare Tunnel the public host differs from the container, so honor forwarded headers —
+// DAV discovery must emit absolute https://dav-api.lupira.com/... hrefs, or clients loop on container URLs.
+var forwarded = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost,
+};
+forwarded.KnownIPNetworks.Clear();
+forwarded.KnownProxies.Clear();
+app.UseForwardedHeaders(forwarded);
 
 if (allowedOrigins.Length > 0) app.UseCors();
 app.UseAuthentication();
