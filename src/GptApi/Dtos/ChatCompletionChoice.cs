@@ -1,13 +1,13 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace GptApi.Models;
+namespace GptApi.Dtos;
 
-public sealed class CompletionChoice
+public sealed class ChatCompletionChoice
 {
     public int Index { get; set; }
 
-    public required string Text { get; set; }
+    public required ChatMessage Message { get; set; }
 
     public string? FinishReason { get; set; }
 

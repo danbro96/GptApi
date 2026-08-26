@@ -1,4 +1,4 @@
-namespace GptApi.Models;
+namespace GptApi.Services;
 
 public sealed class LlamaOptions
 {

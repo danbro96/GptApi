@@ -1,9 +1,9 @@
 using GptApi.Handlers;
-using GptApi.Models;
+using GptApi.Dtos;
 
 namespace GptApi.Endpoints;
 
-public static class ModelsEndpoint
+public static class ModelsEndpoints
 {
     public static IEndpointConventionBuilder MapModelsEndpoint(this IEndpointRouteBuilder app) =>
         app.MapGet("/v1/models", (ModelsHandler h, CancellationToken ct) => h.ListAsync(ct))

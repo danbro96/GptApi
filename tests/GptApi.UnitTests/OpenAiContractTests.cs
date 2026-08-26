@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using GptApi.Models;
+using GptApi.Dtos;
 using Xunit;
 
 namespace GptApi.UnitTests;

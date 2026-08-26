@@ -1,5 +1,5 @@
 using System.Text.Json;
-using GptApi.Models;
+using GptApi.Dtos;
 using Json.Schema;
 
 namespace GptApi.Validation;

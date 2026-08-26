@@ -4,7 +4,7 @@ using System.Threading.RateLimiting;
 using GptApi.Auth;
 using GptApi.Endpoints;
 using GptApi.Handlers;
-using GptApi.Models;
+using GptApi.Dtos;
 using GptApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi;

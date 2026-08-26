@@ -1,5 +1,5 @@
 using System.Net;
-using GptApi.Models;
+using GptApi.Dtos;
 using GptApi.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;

@@ -1,10 +1,10 @@
 using GptApi.Handlers;
-using GptApi.Models;
+using GptApi.Dtos;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GptApi.Endpoints;
 
-public static class EmbeddingsEndpoint
+public static class EmbeddingsEndpoints
 {
     public static IEndpointConventionBuilder MapEmbeddings(this IEndpointRouteBuilder app) =>
         app.MapPost("/v1/embeddings", (

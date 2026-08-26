@@ -1,10 +1,10 @@
 using GptApi.Handlers;
-using GptApi.Models;
+using GptApi.Dtos;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GptApi.Endpoints;
 
-public static class RerankEndpoint
+public static class RerankEndpoints
 {
     public static IEndpointConventionBuilder MapRerank(this IEndpointRouteBuilder app) =>
         app.MapPost("/v1/rerank", (

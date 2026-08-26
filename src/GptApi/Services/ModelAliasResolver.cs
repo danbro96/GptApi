@@ -1,4 +1,4 @@
-using GptApi.Models;
+using GptApi.Dtos;
 using Microsoft.Extensions.Options;
 
 namespace GptApi.Services;

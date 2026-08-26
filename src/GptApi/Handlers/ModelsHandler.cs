@@ -1,5 +1,5 @@
 using System.Text.Json;
-using GptApi.Models;
+using GptApi.Dtos;
 using GptApi.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Caching.Memory;

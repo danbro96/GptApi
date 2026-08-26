@@ -1,10 +1,10 @@
 using GptApi.Handlers;
-using GptApi.Models;
+using GptApi.Dtos;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GptApi.Endpoints;
 
-public static class ChatCompletionsEndpoint
+public static class ChatCompletionsEndpoints
 {
     public static IEndpointConventionBuilder MapChatCompletions(this IEndpointRouteBuilder app) =>
         app.MapPost("/v1/chat/completions", (

@@ -1,5 +1,5 @@
 using GptApi.Handlers;
-using GptApi.Models;
+using GptApi.Dtos;
 using GptApi.Services;
 using GptApi.UnitTests.Support;
 using Microsoft.AspNetCore.Http;

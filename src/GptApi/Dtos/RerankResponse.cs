@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace GptApi.Models;
+namespace GptApi.Dtos;
 
 public sealed class RerankResponse
 {

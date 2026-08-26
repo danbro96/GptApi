@@ -1,4 +1,4 @@
-using GptApi.Models;
+using GptApi.Dtos;
 using GptApi.Services;
 using Microsoft.Extensions.Options;
 using Xunit;
