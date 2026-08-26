@@ -189,8 +189,7 @@ if (!string.IsNullOrWhiteSpace(otlpEndpoint))
 
 var app = builder.Build();
 
-// Behind the Cloudflare Tunnel the public host differs from the container, so honor forwarded headers —
-// DAV discovery must emit absolute https://dav-api.lupira.com/... hrefs, or clients loop on container URLs.
+// Behind the Cloudflare Tunnel the public host differs from the container, so honor forwarded headers.
 var forwarded = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost,

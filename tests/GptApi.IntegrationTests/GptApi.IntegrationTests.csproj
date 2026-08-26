@@ -8,7 +8,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <RootNamespace>GptApi.IntegrationTests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
