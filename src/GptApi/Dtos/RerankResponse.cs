@@ -17,10 +17,3 @@ public sealed class RerankResponse
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? AdditionalProperties { get; set; }
 }
-
-public sealed class RerankResult
-{
-    public int Index { get; set; }
-
-    public double RelevanceScore { get; set; }
-}

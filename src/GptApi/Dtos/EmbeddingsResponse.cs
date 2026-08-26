@@ -17,20 +17,3 @@ public sealed class EmbeddingsResponse
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? AdditionalProperties { get; set; }
 }
-
-public sealed class EmbeddingData
-{
-    [JsonPropertyName("object")]
-    public string Object { get; set; } = "embedding";
-
-    public required IReadOnlyList<float> Embedding { get; set; }
-
-    public int Index { get; set; }
-}
-
-public sealed class EmbeddingsUsage
-{
-    public int PromptTokens { get; set; }
-
-    public int TotalTokens { get; set; }
-}

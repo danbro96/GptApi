@@ -4,12 +4,6 @@ using Json.Schema;
 
 namespace GptApi.Validation;
 
-public readonly record struct SchemaVerdict(bool Ok, string? Error)
-{
-    public static readonly SchemaVerdict Pass = new(true, null);
-    public static SchemaVerdict Fail(string error) => new(false, error);
-}
-
 /// <summary>Validates a worker chat response against the caller's <c>response_format.json_schema</c> — the
 /// defense-in-depth layer behind the worker's grammar-constrained decoding. Each choice's message content is
 /// expected to be a JSON string conforming to the schema.</summary>

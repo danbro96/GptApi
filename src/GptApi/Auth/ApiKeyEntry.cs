@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Authentication;
-
 namespace GptApi.Auth;
 
 public sealed class ApiKeyEntry
@@ -20,22 +18,4 @@ public sealed class ApiKeyEntry
     /// scheduling (latency-sensitive tiers winning contention) is a llama-swap-level follow-up —
     /// the ASP.NET rate limiter only arbitrates within a single key's partition.</summary>
     public KeyPriority Priority { get; set; } = KeyPriority.Normal;
-}
-
-public enum KeyPriority
-{
-    Low,
-    Normal,
-    High,
-}
-
-public sealed class ApiKeyAuthOptions : AuthenticationSchemeOptions
-{
-    public const string SchemeName = "ApiKey";
-    public const string HeaderName = "X-API-Key";
-    public const string QueryName = "api_key";
-
-    public List<ApiKeyEntry> ApiKeys { get; set; } = new();
-
-    public List<string> AllowedOrigins { get; set; } = new();
 }

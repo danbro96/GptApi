@@ -55,19 +55,3 @@ public sealed class LlamaOptions
         return backends.Count == 1 ? backends[0].Name : null;
     }
 }
-
-public sealed class BackendOptions
-{
-    public string Name { get; set; } = string.Empty;
-
-    public string Url { get; set; } = string.Empty;
-}
-
-public sealed class ModelRoute
-{
-    public string Model { get; set; } = string.Empty;
-
-    public string Backend { get; set; } = string.Empty;
-
-    public string? Fallback { get; set; }
-}

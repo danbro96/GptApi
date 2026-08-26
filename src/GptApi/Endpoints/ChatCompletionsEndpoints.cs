@@ -1,5 +1,5 @@
-using GptApi.Handlers;
 using GptApi.Dtos;
+using GptApi.Handlers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GptApi.Endpoints;
