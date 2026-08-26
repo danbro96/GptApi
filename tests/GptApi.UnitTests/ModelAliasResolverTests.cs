@@ -30,7 +30,7 @@ public class ModelAliasResolverTests
     public void Resolve_passes_through_unknown_id_unchanged()
     {
         Assert.Equal("qwen3-14b", Resolver().Resolve("qwen3-14b"));
-        Assert.Equal("", Resolver().Resolve(""));
+        Assert.Equal(string.Empty, Resolver().Resolve(string.Empty));
     }
 
     [Fact]

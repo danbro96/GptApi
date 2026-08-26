@@ -13,6 +13,7 @@ internal sealed class CapturingStubHandler(string responseJson, HttpStatusCode s
     : HttpMessageHandler
 {
     public string? LastBody { get; private set; }
+
     public int Calls { get; private set; }
 
     protected override async Task<HttpResponseMessage> SendAsync(

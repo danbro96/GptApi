@@ -51,6 +51,7 @@ public class AliasForwardingTests
     }
 
     private static JsonElement Str(string s) => JsonSerializer.SerializeToElement(s);
+
     private static IResult Inner(INestedHttpResult result) => result.Result;
 
     [Fact]

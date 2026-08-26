@@ -9,7 +9,7 @@ namespace GptApi.UnitTests;
 /// and the fixed <c>object</c> discriminators. Mirrors the JSON options configured in Program.cs.</summary>
 public class OpenAiContractTests
 {
-    static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         PropertyNameCaseInsensitive = true,
