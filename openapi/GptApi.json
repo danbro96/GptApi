@@ -13,6 +13,7 @@
         ],
         "summary": "List the models the worker has configured.",
         "description": "Returns the model list reported by the worker, in OpenAI-compatible\nshape. With llama-swap this is the full set of declared models; pick\none by sending its `id` in the `model` field of completion requests.\n\nCached for 60 s to avoid hammering the worker on every IDE poll.",
+        "operationId": "ListModels",
         "responses": {
           "200": {
             "description": "OK",
@@ -82,6 +83,7 @@
         ],
         "summary": "Generate a chat completion (OpenAI-compatible).",
         "description": "OpenAI-compatible chat completion endpoint. Drop-in replacement for\n`https://api.openai.com/v1/chat/completions` for any client that supports\na configurable base URL.\n\nSet `stream: true` to receive a `text/event-stream` response with\n`data: {chunk}` lines terminated by `data: [DONE]`. Otherwise the response\nis a single buffered JSON body.\n\nUnknown fields (e.g. new OpenAI parameters like `response_format`,\n`tool_choice`) are forwarded to the worker untouched.",
+        "operationId": "CreateChatCompletion",
         "requestBody": {
           "content": {
             "application/json": {
@@ -164,6 +166,7 @@
         ],
         "summary": "Generate a text completion (legacy OpenAI shape).",
         "description": "Legacy OpenAI-compatible text completion endpoint. Most clients should\nprefer `/v1/chat/completions` — this exists for tooling that still speaks\nthe older format.\n\nSet `stream: true` for SSE streaming. The `prompt` field accepts either a\nstring or an array of strings.",
+        "operationId": "CreateCompletion",
         "requestBody": {
           "content": {
             "application/json": {
@@ -246,6 +249,7 @@
         ],
         "summary": "Create embeddings (OpenAI-compatible).",
         "description": "OpenAI-compatible embeddings endpoint. Drop-in replacement for\n`https://api.openai.com/v1/embeddings`. `input` accepts a string or an array\nof strings. Routed to the embedding-model backend; not streamed.",
+        "operationId": "CreateEmbedding",
         "requestBody": {
           "content": {
             "application/json": {
@@ -335,6 +339,7 @@
         ],
         "summary": "Rerank documents against a query (Jina/Cohere-shape).",
         "description": "Cross-encoder reranking — scores each `documents[]` entry against `query` and\nreturns `results` sorted by `relevance_score`. Second stage after an embeddings\ntop-K retrieval. Routed to the reranker backend; not streamed.",
+        "operationId": "CreateRerank",
         "requestBody": {
           "content": {
             "application/json": {

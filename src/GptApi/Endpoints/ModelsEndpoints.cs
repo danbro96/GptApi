@@ -19,5 +19,6 @@ public static class ModelsEndpoints
                 """)
             .Produces<ModelsResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status502BadGateway)
-            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
+            .WithName("ListModels");
 }
