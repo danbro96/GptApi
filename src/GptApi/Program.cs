@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using GptApi.Auth;
+using GptApi.Dependencies;
 using GptApi.Endpoints;
 using GptApi.Handlers;
 using GptApi.Http;
@@ -37,6 +38,16 @@ foreach (var backend in llamaOptions.EffectiveBackends())
 }
 
 builder.Services.AddSingleton<LlamaRouter>();
+
+// Non-gating dependency probe (/depz): edges derive from the backends above, probed on a dedicated client.
+builder.Services.Configure<DepzOptions>(builder.Configuration.GetSection(DepzOptions.SectionName));
+var depzOptions = builder.Configuration.GetSection(DepzOptions.SectionName).Get<DepzOptions>() ?? new DepzOptions();
+builder.Services.AddSingleton(DependencyTargets.From(llamaOptions));
+builder.Services.AddSingleton<DependencyReportCache>();
+builder.Services.AddSingleton<DependencyProbe>();
+builder.Services.AddHttpClient(DependencyProbe.ProbeClientName, c => c.Timeout = depzOptions.ProbeTimeout);
+if (depzOptions.Enabled)
+    builder.Services.AddHostedService<DependencyPollWorker>();
 builder.Services.AddSingleton<ModelAliasResolver>();
 
 builder.Services.AddScoped<ChatHandler>();
@@ -227,7 +238,8 @@ if (!string.IsNullOrWhiteSpace(otlpEndpoint))
             {
                 o.RecordException = true;
                 // Health probes are polled constantly by docker + devops-monitor; their spans add nothing.
-                o.Filter = ctx => ctx.Request.Path != "/livez" && ctx.Request.Path != "/readyz";
+                o.Filter = ctx => ctx.Request.Path != "/livez" && ctx.Request.Path != "/readyz"
+                    && ctx.Request.Path != "/depz";
             })
             .AddHttpClientInstrumentation()
             .AddOtlpExporter())
@@ -235,6 +247,7 @@ if (!string.IsNullOrWhiteSpace(otlpEndpoint))
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
             .AddRuntimeInstrumentation()
+            .AddMeter("GptApi.Depz")
             .AddOtlpExporter());
 
     builder.Logging.AddOpenTelemetry(o =>
@@ -273,6 +286,7 @@ app.MapScalarApiReference("/scalar", o => o
     .AllowAnonymous();
 
 app.MapAppHealthChecks(app.Environment);
+app.MapDepz();
 app.MapModelsEndpoint().RequireAuthorization();
 app.MapChatCompletions().RequireAuthorization();
 app.MapCompletions().RequireAuthorization();

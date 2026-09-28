@@ -31,6 +31,7 @@ A `model` with no configured route goes to the default backend (an always-on one
 |---|---|---|---|
 | `GET` | `/livez` | anonymous | Liveness; process up (no dependency check). |
 | `GET` | `/readyz` | anonymous | Readiness; pings the always-on default (NAS) backend. Used by the container healthcheck. |
+| `GET` | `/depz` | `X-Probe-Key` | Non-gating dependency report (one edge per llama-swap backend); off unless `Depz__ProbeKey` is set. |
 | `GET` | `/v1/models` | api-key | Lists the configured models — union across all backends, 60 s cache. |
 | `POST` | `/v1/chat/completions` | api-key | Chat completion. Set `stream: true` for SSE. |
 | `POST` | `/v1/completions` | api-key | Legacy text completion. Same `stream` semantics. |
